@@ -1,0 +1,20 @@
+{
+  "name": "@pulse/agent",
+  "version": "0.0.1",
+  "description": "Reference agent that commits intent via Pulse",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "demo:swap": "tsx src/scenarios/uniswap-stop-loss.ts"
+  },
+  "dependencies": {
+    "@pulse/sdk": "workspace:*",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "MIT"
+}

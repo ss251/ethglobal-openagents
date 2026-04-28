@@ -1,0 +1,39 @@
+# Foundry
+cache/
+out/
+broadcast/
+.gas-snapshot
+
+# Dependencies
+lib/
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local research notes (not for public repo)
+research/
+
+# Claude Code internal state
+.claude/scheduled_tasks.lock
+.claude/state/

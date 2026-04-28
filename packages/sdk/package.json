@@ -1,0 +1,22 @@
+{
+  "name": "@pulse/sdk",
+  "version": "0.0.1",
+  "description": "TypeScript SDK for Pulse — galaxy-brain-resistant agent commitments",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "viem": "^2.21.0",
+    "@0glabs/0g-serving-broker": "^0.7.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^22.0.0"
+  },
+  "license": "MIT"
+}

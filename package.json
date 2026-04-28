@@ -1,0 +1,12 @@
+{
+  "name": "pulse-protocol",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "bun --filter '*' build",
+    "test": "forge test"
+  },
+  "license": "MIT"
+}

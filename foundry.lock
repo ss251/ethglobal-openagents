@@ -1,0 +1,32 @@
+{
+  ".claude/skills/ethskills": {
+    "rev": "ec4848cd320b8115750dd1aaac648edc175d7a93"
+  },
+  ".claude/skills/pashov-skills": {
+    "rev": "749903d4a068477344739f9bb3346ca35a06be60"
+  },
+  "lib/erc-8004-contracts": {
+    "rev": "0463311492b3a7fc5fdb6990231cce721ff6cf97"
+  },
+  "lib/forge-std": {
+    "tag": {
+      "name": "v1.16.0",
+      "rev": "8987040ede9553cea20c95ad40d0455930f9c8e0"
+    }
+  },
+  "lib/openzeppelin-contracts": {
+    "tag": {
+      "name": "v5.1.0",
+      "rev": "69c8def5f222ff96f2b5beff05dfba996368aa79"
+    }
+  },
+  "lib/v4-core": {
+    "tag": {
+      "name": "v4.0.0",
+      "rev": "e50237c43811bd9b526eff40f26772152a42daba"
+    }
+  },
+  "lib/v4-periphery": {
+    "rev": "9dafaaecc1e2e1e824eda9d941085f96517d827b"
+  }
+}
