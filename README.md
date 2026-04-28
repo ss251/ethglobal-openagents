@@ -198,6 +198,30 @@ Framework adapter recipes for OpenClaw, Hermes, ElizaOS, LangChain,
 Anthropic SDK, and Python live in
 [`packages/plugins/pulse-skills/integrations/`](packages/plugins/pulse-skills/integrations/).
 
+## Threat model — what Pulse defends against and what it doesn't
+
+Pulse is a signaling and enforcement primitive for *committing* agents. It
+does not pretend to be a fortress against *non-committing* adversaries. The
+honest table:
+
+| Attack | Defended? | Notes |
+| --- | --- | --- |
+| Agent reasoning drifts between commit and execution (injection, social engineering, rationalization) | **Yes** for v4 swaps via `PulseGatedHook` (revert before state change). **Yes** for non-swap actions via direct `Pulse.reveal` mismatch detection + ERC-8004 slash. | The core thing Pulse is designed for. |
+| Atomic-reveal rollback gap: hook reverts on mismatch, the would-be `Violated` state rolls back too | **Mitigated** via `scripts/watch-and-slash.ts`, a watcher service that calls `Pulse.reveal` directly with the mismatched data outside the hook flow. Locks in the slash. | See SPEC §"Atomic-reveal rollback note." |
+| Front-run on reveal broadcast | **Mitigated for swaps** (atomic reveal inside `beforeSwap`). Open for non-swap actions — use private mempool (Flashbots Protect) for those. | |
+| Malicious operator never opts in | **Not defended.** Pulse is voluntary. The defense is downstream: as credit, yield, and task layers price ERC-8004 reputation, non-committing agents get worse terms over time. | |
+| Reputation farming via trivial commitments | **Not defended in v0.3.** Future work: stake-weighted reputation. | |
+| Vague reasoning that covers any future action | **Partial.** Pulse certifies hash equality, not semantic specificity. Recommend a minimum-substance reasoning policy enforced off-chain by reviewers. | |
+| Selective reveal / optionality (commit to multiple actions, reveal the favorable one) | **Not defended in v0.3.** Each unrevealed commitment costs `-500` rep on expiry. Profitable only if reputation isn't economically priced. | |
+| Sybil / burner agents | **Inherits ERC-8004 weakness.** No proof-of-personhood. | |
+| `signerProvider` is an EOA pretending to be a TEE | **Honestly disclosed.** The contract checks ECDSA recovery, not attestation. README, SPEC, and demo UI all explicitly label "stand-in vs production 0G enclave-born key." | |
+| Wash-trade reputation between same-owner agents | **Inherited ERC-8004 weakness.** | |
+| Honest-on-paper, malicious-in-practice business model | **Not defended.** Pulse certifies *consistency*, not *quality of intent.* | |
+
+The `watch-and-slash.ts` watcher is the single most important post-deployment
+operational addition — it closes the atomic-reveal rollback gap without
+contract changes.
+
 ## Status
 
 Initial scaffold complete. Tests: 17 passing

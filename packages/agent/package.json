@@ -6,7 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "demo:swap": "tsx src/scenarios/uniswap-stop-loss.ts"
+    "demo:swap": "tsx src/scenarios/pulse-bound-swap.ts"
   },
   "dependencies": {
     "@pulse/sdk": "workspace:*",
