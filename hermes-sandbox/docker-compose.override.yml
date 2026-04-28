@@ -1,0 +1,55 @@
+# Layered configuration on top of Hermes upstream's docker-compose.yml.
+#
+# Use as:
+#   cd hermes-sandbox/upstream
+#   docker compose -f docker-compose.yml -f ../docker-compose.override.yml up -d
+#
+# (Or via the wrapper scripts: ./up.sh)
+#
+# Why an override instead of replacing upstream's compose:
+#   - Upstream owns the build context, image name, entrypoint, volumes, and
+#     UID-remapping logic. Replacing it means we have to keep up with their
+#     changes manually. Overriding lets us pin only what we care about.
+
+services:
+  gateway:
+    # Force HERMES_UID/HERMES_GID to host user so files in ~/.hermes stay
+    # readable on the host (matches upstream's intended workflow but makes it
+    # explicit for our setup).
+    environment:
+      - HERMES_UID=${HERMES_UID:-10000}
+      - HERMES_GID=${HERMES_GID:-10000}
+
+    # Pass through Pulse contract addresses + Trading API key + the agent's
+    # throwaway Sepolia key. Read from hermes-sandbox/.env (gitignored),
+    # NOT baked into the image. Required: false so the build doesn't fail
+    # when the file is missing — runtime tools that need these vars will
+    # fail at call time with a clear error instead.
+    env_file:
+      - path: ./.env
+        required: false
+
+    # Resource caps — Hermes's gateway can spawn subprocesses (MCP servers,
+    # browsers, git, etc.). Bound them so a runaway prompt can't peg the host.
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+    # Tighter security defaults. Note we keep network_mode: host because
+    # upstream relies on it for the gateway → dashboard local link. If you
+    # want full network isolation, switch to bridge mode and re-route the
+    # dashboard explicitly.
+    security_opt:
+      - no-new-privileges:true
+
+  dashboard:
+    environment:
+      - HERMES_UID=${HERMES_UID:-10000}
+      - HERMES_GID=${HERMES_GID:-10000}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
