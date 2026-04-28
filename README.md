@@ -1,25 +1,67 @@
-# Pulse
+# Pulse Protocol
 
-> Galaxy-brain-resistant agent commitments. The first onchain primitive where an autonomous AI agent literally cannot change its mind after the market moves — enforceable at the AMM layer.
+**Sealed Agent Commitments — extending the audit perimeter to the agent's reasoning.**
 
-## What it is
+On April 18, 2026, KelpDAO and Aave lost $292 million. The smart contracts
+were fine. No bug, no broken logic. The vulnerability was a single off-chain
+configuration decision — outside the perimeter every audit had ever covered.
 
-Two cooperating contracts:
+OpenZeppelin's postmortem named the gap: *code risk and operational risk are
+not the same problem.* As protocols deepen integrations with off-chain
+infrastructure, the operational surface grows faster than the auditable code
+surface. ([Lessons From the KelpDAO Hack](https://www.openzeppelin.com/news/lessons-from-kelpdao-hack))
 
-**`Pulse.sol`** — the commitment primitive. AI agents:
-1. **Commit** to a hashed action with sealed-inference reasoning at time `T`
-2. **Reveal** the matching action between `T+executeAfter` and `T+revealDeadline`
-3. Get **rewarded reputation** (kept), **penalized** (mismatched reveal = violated), or **expired** (no reveal)
+**Autonomous AI agents widen this gap.** The most consequential off-chain
+component in any agent-driven protocol is the agent's *reasoning* — and audits
+never see it. A model can be injected, drifted, or socially engineered, and
+the contract executes the resulting action exactly as written.
 
-**`PulseGatedHook.sol`** — a Uniswap v4 hook that turns a Pulse commitment into a swap permission. Pools deployed with this hook only execute swaps whose `(key, params)` hashes match a pending or revealed Pulse commitment in the open window. Without a matching commitment, the swap reverts.
+## What Pulse does
 
-Reasoning is signed by a TEE provider via standard EIP-191 `personal_sign`. Onchain verification uses OpenZeppelin's `SignatureChecker` (handles both EOA and ERC-1271 signers). Reputation flows through the canonical ERC-8004 `ReputationRegistry`.
+Pulse extends the audit perimeter to the agent's reasoning. At decision time:
 
-## Why
+1. The agent calls a TEE and receives sealed reasoning + a cryptographic signature.
+2. It commits the hash of `(action + reasoning)` onchain, identified by its ENS name (e.g. `forge.pulseagent.eth`) and ERC-8004 token id.
+3. Inside a fixed reveal window, the agent must reveal an action whose hash matches the commitment. Mismatch → automatic ERC-8004 reputation slash. No reveal → expiry slash.
+4. On Uniswap v4, `PulseGatedHook` makes wrong-intent swaps physically impossible — they revert before any state change. Off-chain, the agent's swap path goes through the Uniswap Trading API.
 
-> "Decision-makers should commit to decision rules BEFORE knowing which outcome benefits them." — Vitalik Buterin, *Galaxy Brain Resistance* (Nov 2025)
+The result: continuous reasoning provenance, not point-in-time signature.
+Drift between intent and execution becomes detectable, slashable, and — at
+the v4 layer — non-executable.
 
-Autonomous agents act 24/7 without oversight. Without binding commitments, they are vulnerable to MEV searchers, social engineering, prompt injection mid-flight, and rationalization drift. Pulse makes the agent's pre-commitment cryptographically self-enforcing: **the model cannot retroactively rewrite its own reasoning after the market moves**, and any attempt to do so is detectable, on-chain, and reputation-damaging. With `PulseGatedHook`, the binding is enforced at the swap layer — wrong-intent swaps don't just lose reputation, they don't execute at all.
+## Components
+
+**`Pulse.sol`** — the commitment primitive. Time-locked commit-reveal of
+`(action + sealed reasoning)`. Status transitions: `Pending → Revealed` (kept),
+`Pending → Violated` (mismatched reveal), or `Pending → Expired` (no reveal).
+ERC-8004 `ReputationRegistry.giveFeedback` fires on every transition.
+
+**`PulseGatedHook.sol`** — Uniswap v4 hook with only `BEFORE_SWAP_FLAG` (no
+NoOp surface). Swaps must include `hookData = abi.encode(commitmentId, nonce)`;
+the hook either atomically reveals a `Pending` commitment or hash-verifies a
+`Revealed` one. Wrong intent → revert before state change.
+
+**ENS Agent Identity** — agents register ENS subnames (e.g.
+`forge.pulseagent.eth`) whose text records resolve to their ERC-8004 entry,
+TEE signer, and Pulse commitment history. One human-readable handle for the
+agent's full provenance.
+
+**Uniswap Trading API integration** — agents compute swap intents via the
+Trading API (`trade-api.gateway.uniswap.org/v1/quote`), commit the resulting
+`(PoolKey, SwapParams)` hash via Pulse, then execute through a v4 pool wired
+with `PulseGatedHook` for protocol-level enforcement.
+
+Reasoning is signed by a TEE provider via standard EIP-191 `personal_sign`.
+Onchain verification uses OpenZeppelin's `SignatureChecker` (handles both EOA
+and ERC-1271 signers). Reputation flows through the canonical ERC-8004
+`ReputationRegistry`.
+
+## Honest scope
+
+- **Demo**: hardware-backed stand-in signer for reliability and reproducibility.
+- **Production path**: 0G Compute sealed inference with enclave-born keys.
+- The signer is fully pluggable (Phala, Marlin, Oasis, your own enclave).
+- Pulse is voluntary signaling for agents that want to prove they're well-behaved. It does not stop bad actors from never opting in. As credit and yield primitives start reading ERC-8004 reputation, non-committing agents get priced out over time.
 
 ## Architecture
 
@@ -138,10 +180,10 @@ can plug into Pulse without re-deriving the agent-side know-how.
 
 ```bash
 # install via skills.sh
-npx skills add thescoho/ethglobal-openagents
+npx skills add ss251/ethglobal-openagents
 
 # or via Claude Code marketplace
-/plugin install pulse-skills@thescoho/ethglobal-openagents
+/plugin install pulse-skills@ss251/ethglobal-openagents
 ```
 
 | Skill                          | When to use                                                                                              |

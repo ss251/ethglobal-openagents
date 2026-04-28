@@ -1,7 +1,7 @@
 {
   "name": "@pulse/sdk",
   "version": "0.0.1",
-  "description": "TypeScript SDK for Pulse — galaxy-brain-resistant agent commitments",
+  "description": "TypeScript SDK for Pulse — sealed agent commitments. Trading API + ENS identity + sealed-inference + v4 hook helpers.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

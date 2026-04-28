@@ -1,24 +1,73 @@
-# SPEC: Galaxy-Brain-Resistant Agent Commitment Standard (Pulse)
+# SPEC: Pulse — Sealed Agent Commitment Standard
 
-**Status**: Draft, v0.2
+**Status**: Draft, v0.3
 **Date**: 2026-04-28
 
 ## Abstract
 
-A standard for autonomous AI agents to make cryptographically binding pre-commitments onchain. An agent commits to a hashed action paired with sealed-inference reasoning at time T. Between T+executeAfter and T+revealDeadline, the agent must reveal an action whose hash matches the commitment, otherwise the commitment is marked violated or expired and the agent's onchain reputation is penalized via ERC-8004.
+A standard for autonomous AI agents to extend the audit perimeter to their
+own off-chain reasoning. An agent commits to a hashed action paired with
+sealed-inference reasoning at time `T`. Between `T+executeAfter` and
+`T+revealDeadline`, the agent must reveal an action whose hash matches the
+commitment; otherwise the commitment is marked `Violated` or `Expired` and
+the agent's onchain reputation is penalized via ERC-8004.
 
-This v0.2 introduces an optional **swap-layer enforcement** primitive: a Uniswap v4 hook that gates swap execution on the existence of a matching Pulse commitment, turning the binding from "rep-only" to "rep + execution".
+This v0.3 specifies three execution layers:
+
+1. **Direct reveal** — `Pulse.reveal(id, nonce, actionData)` validates
+   `(nonce, actionData) → intentHash` and triggers reputation feedback.
+2. **Uniswap Trading API path** — agents compute swap intents via the
+   Trading API and commit the canonical `(PoolKey, SwapParams)` hash before
+   execution.
+3. **Optional v4 hook enforcement** — `PulseGatedHook` makes wrong-intent
+   swaps physically impossible at the AMM layer; reveal happens atomically
+   inside `beforeSwap`.
+
+Agent identity is resolved via ENS subnames whose text records expose the
+agent's ERC-8004 token id, TEE signer, and Pulse commitment history.
 
 ## Motivation
 
-Autonomous agents act 24/7 without per-decision human oversight. They are vulnerable to:
+On April 18, 2026, KelpDAO and Aave lost approximately $292M without a single
+smart-contract bug. The vulnerability was a single off-chain configuration
+choice — a single LayerZero DVN whose RPC infrastructure was compromised.
+OpenZeppelin's postmortem framed the gap precisely:
 
-- Mid-flight prompt injection altering decisions
-- MEV searchers / whales that can game agent reaction
-- Social engineering that makes the operator pressure the agent post-decision
-- Rationalization drift — model "changes its mind" based on selectively-presented late information
+> "Code risk and operational risk are not the same problem. Treating them as
+> one is what the next $292 million will cost."
+>
+> — *Lessons From the KelpDAO Hack*, OpenZeppelin (April 2026)
 
-Existing patterns (commit-reveal schemes, time-locks like OpenZeppelin's TimelockController, EIP-7715 session keys) address adjacent problems but none combine commit-reveal + time-lock + sealed-inference reasoning + onchain reputation in a single agent-aware primitive — and none enforce the binding at the AMM layer.
+Smart contract audits review function logic, access control, arithmetic, and
+reentrancy. They do not review integration configuration, off-chain
+infrastructure dependencies, or architectural trust assumptions. The
+operational surface grows faster than the auditable code surface.
+
+Autonomous AI agents widen the gap further. The agent's reasoning — the
+model's actual decision process — is the single most consequential off-chain
+component in any agent-driven protocol, and it is fully outside the
+perimeter of every audit ever performed on agent code. A model can be:
+
+- Injected by adversarial input mid-flight
+- Drifted by selectively-presented late information ("rationalization drift")
+- Socially engineered through operator pressure post-decision
+- Compromised by upstream changes to model weights, prompt templates, or context
+
+In every case, the contract executes the resulting action exactly as written.
+The audit doesn't fire. The bug isn't there.
+
+Existing patterns address adjacent problems but none cover the agent-reasoning
+gap. Commit-reveal schemes bind action hashes (and predate AI agents). Time
+locks like OpenZeppelin's `TimelockController` enforce delays. EIP-7715 session
+keys scope wallet permissions. None bind the agent's *reasoning* to the moment
+of decision, with cryptographic detection of drift, automatic onchain
+reputation impact, and protocol-level execution gating.
+
+Pulse is the missing primitive. It applies the same multi-attestation
+principle OpenZeppelin recommends for cross-chain integration (multi-DVN
+redundancy, continuous coverage) to agent reasoning: sealed inference as the
+attestation, time-bounded commit-reveal as the verification window, ERC-8004
+as the feedback layer, and Uniswap v4 hooks as the AMM-layer enforcement.
 
 ## Specification
 
