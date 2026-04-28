@@ -5,6 +5,9 @@
   ".claude/skills/pashov-skills": {
     "rev": "749903d4a068477344739f9bb3346ca35a06be60"
   },
+  ".claude/skills/uniswap-ai": {
+    "rev": "b0ea05435eb29087bdb4703b1178c988d427958e"
+  },
   "lib/erc-8004-contracts": {
     "rev": "0463311492b3a7fc5fdb6990231cce721ff6cf97"
   },
@@ -18,6 +21,15 @@
     "tag": {
       "name": "v5.1.0",
       "rev": "69c8def5f222ff96f2b5beff05dfba996368aa79"
+    }
+  },
+  "lib/solmate": {
+    "rev": "89365b880c4f3c786bdd453d4b8e8fe410344a69"
+  },
+  "lib/uniswap-hooks": {
+    "tag": {
+      "name": "v1.2.1",
+      "rev": "acbd604c409a827f7f98c9517236da860c4fca1a"
     }
   },
   "lib/v4-core": {

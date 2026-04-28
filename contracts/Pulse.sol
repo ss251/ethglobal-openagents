@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.26;
 
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
@@ -147,6 +147,13 @@ contract Pulse is ReentrancyGuard {
 
     function getStatus(uint256 id) external view returns (Status) {
         return commitments[id].status;
+    }
+
+    /// @notice Read a full commitment by id. Returns the zero-initialized struct if missing.
+    /// External integrations (e.g., the v4 hook) consume this view rather than the
+    /// auto-generated public getter so they can pattern-match the entire struct.
+    function getCommitment(uint256 id) external view returns (Commitment memory) {
+        return commitments[id];
     }
 
     function _scoreAgent(
