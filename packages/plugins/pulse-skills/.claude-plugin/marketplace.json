@@ -1,0 +1,18 @@
+{
+  "name": "pulse-skills",
+  "version": "0.2.0",
+  "owner": {
+    "name": "Pulse"
+  },
+  "metadata": {
+    "description": "Pulse — galaxy-brain-resistant agent commitments. Skills bundle any agent framework can install via skills.sh / Claude Code marketplace to bind itself to its own pre-decisions.",
+    "repository": "https://github.com/thescoho/ethglobal-openagents"
+  },
+  "plugins": [
+    {
+      "name": "pulse-skills",
+      "source": "./",
+      "description": "Pulse commit/reveal/check skills + Uniswap v4 hook-gated swap skill + sealed-inference skill"
+    }
+  ]
+}

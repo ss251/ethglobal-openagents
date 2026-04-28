@@ -3,7 +3,10 @@
 ## What this is
 `Pulse.sol` — galaxy-brain-resistant agent commitments. Time-locked commit-reveal
 with TEE-attested reasoning. ERC-8004 reputation hooks. Optional Uniswap v4 hook
-gating swaps by Pulse commitments.
+gating swaps by Pulse commitments. Ships with `pulse-skills` — a drop-in
+agent-agnostic skills bundle (`packages/plugins/pulse-skills/`) so any agent
+framework (OpenClaw, Hermes, ElizaOS, LangChain, custom) can plug into Pulse
+via `npx skills add thescoho/ethglobal-openagents` or `/plugin install`.
 
 ## Toolchain
 - Solidity 0.8.26, EVM Cancun, via_ir on
@@ -28,6 +31,7 @@ Skills live under `.claude/skills/`. Top-level entries are canonical
 | `pashov-x-ray` | Diff-level audit when refactoring contracts. |
 | `0g-compute-skills` | 0G Compute SDK — `processResponse`, broker setup, sealed inference. |
 | `eth-security`, `eth-gas`, `eth-audit`, `eth-testing`, `eth-defi`, `eth-standards`, `eth-wallets`, `eth-openclaw` | Topic-specific patterns from austintgriffith/ethskills. |
+| `pulse-skills` (`packages/plugins/pulse-skills/`) | Built in this repo — bind any agent to its own pre-decisions via Pulse. Skills: `pulse-commit`, `pulse-reveal`, `pulse-status-check`, `pulse-gated-swap`, `sealed-inference-with-pulse`. |
 
 ## Working rules
 - Use OpenZeppelin standardized contracts wherever possible (`ECDSA`, `SignatureChecker`, `MessageHashUtils`, `ReentrancyGuard`).

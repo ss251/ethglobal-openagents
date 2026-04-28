@@ -113,18 +113,48 @@ test/
 └── PulseGatedHook.t.sol            # 11 tests on the v4 hook layer
 packages/
 ├── sdk/                            # @pulse/sdk — TypeScript client + intent/hookData helpers
-└── agent/                          # reference agent that uses Pulse
+├── agent/                          # reference agent that uses Pulse
+└── plugins/
+    └── pulse-skills/               # agent-agnostic skill bundle (any agent can install)
 .claude/
-└── skills/                         # agent skills (Uniswap, OZ, Pashov, ethskills, 0g-compute)
+└── skills/                         # third-party skills consumed in this repo (Uniswap, OZ, Pashov, ethskills, 0g-compute)
 ```
 
 ## Skills
 
-This repo includes the `Uniswap/uniswap-ai` skills and the OpenZeppelin
+### Consumed in this repo
+
+This repo uses the `Uniswap/uniswap-ai` skills and the OpenZeppelin
 `uniswap-hooks` library — the v4 hook here was built using their
 `v4-hook-generator` decision table and audited against the
 `v4-security-foundations` checklist before commit. See `CLAUDE.md` for the
 full skill index and which skill applies to which task.
+
+### Published by this repo: `pulse-skills`
+
+Pulse ships its own agent-agnostic skill bundle so **any** agent runtime
+(OpenClaw, Hermes, ElizaOS / Eliza, LangChain, bare Anthropic-API, web3.py)
+can plug into Pulse without re-deriving the agent-side know-how.
+
+```bash
+# install via skills.sh
+npx skills add thescoho/ethglobal-openagents
+
+# or via Claude Code marketplace
+/plugin install pulse-skills@thescoho/ethglobal-openagents
+```
+
+| Skill                          | When to use                                                                                              |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `pulse-commit`                 | Bind agent to a hashed action + sealed reasoning at time T.                                              |
+| `pulse-reveal`                 | Close a commitment with matching nonce + actionData inside the window.                                   |
+| `pulse-status-check`           | Read commitment state cheaply before reveal/swap/expire.                                                 |
+| `pulse-gated-swap`             | Execute a Uniswap v4 swap *through* a Pulse commitment — wrong intent doesn't just slash, it reverts.    |
+| `sealed-inference-with-pulse`  | Pull TEE-signed reasoning (0G Compute or any EIP-191 signer) and bind it to commit.                      |
+
+Framework adapter recipes for OpenClaw, Hermes, ElizaOS, LangChain,
+Anthropic SDK, and Python live in
+[`packages/plugins/pulse-skills/integrations/`](packages/plugins/pulse-skills/integrations/).
 
 ## Status
 

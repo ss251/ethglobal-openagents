@@ -1,0 +1,31 @@
+{
+  "name": "@pulse/skills",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Agent-agnostic skills for Pulse — galaxy-brain-resistant onchain commitments with optional Uniswap v4 hook gating",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thescoho/ethglobal-openagents.git",
+    "directory": "packages/plugins/pulse-skills"
+  },
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "skill",
+    "pulse",
+    "agent",
+    "ai-agent",
+    "erc-8004",
+    "uniswap-v4",
+    "openclaw",
+    "hermes",
+    "elizaos"
+  ],
+  "files": [
+    ".claude-plugin",
+    "skills",
+    "integrations",
+    "README.md"
+  ]
+}
