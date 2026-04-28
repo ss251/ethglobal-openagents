@@ -1,0 +1,76 @@
+{
+  "chainId": 84532,
+  "chainName": "Base Sepolia",
+  "rpcUrl": "https://sepolia.base.org",
+  "explorer": "https://sepolia.basescan.org",
+  "deployedAt": "2026-04-28T17:56:00Z",
+  "deployer": "0x050F72f9332eb1Ef289ca497F8dA911a14066Fa1",
+  "contracts": {
+    "Pulse": {
+      "address": "0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34",
+      "explorer": "https://sepolia.basescan.org/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34",
+      "constructorArgs": {
+        "identityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+        "reputationRegistry": "0x8004B663056A597Dffe9eCcC1965A193B7388713"
+      }
+    },
+    "PulseGatedHook": {
+      "address": "0x137002596a3a818B36d82490cF79B35c376e8080",
+      "explorer": "https://sepolia.basescan.org/address/0x137002596a3a818B36d82490cF79B35c376e8080",
+      "constructorArgs": {
+        "poolManager": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+        "pulse": "0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34"
+      },
+      "create2Salt": 57991,
+      "permissionFlags": "0x0080",
+      "permissionFlagsDecoded": "BEFORE_SWAP_FLAG only (no NoOp surface, no beforeSwapReturnDelta)"
+    }
+  },
+  "dependencies": {
+    "ERC8004IdentityRegistry": {
+      "address": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+      "note": "Canonical, do not redeploy"
+    },
+    "ERC8004ReputationRegistry": {
+      "address": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+      "note": "Canonical, do not redeploy"
+    },
+    "UniswapV4PoolManager": {
+      "address": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+      "source": "https://developers.uniswap.org/contracts/v4/deployments"
+    },
+    "UniswapV4PoolSwapTest": {
+      "address": "0x8b5bcc363dde2614281ad875bad385e0a785d3b9"
+    },
+    "UniswapV4PoolModifyLiquidityTest": {
+      "address": "0x37429cd17cb1454c34e7f50b09725202fd533039"
+    },
+    "UniswapV4PositionManager": {
+      "address": "0x4b2c77d209d3405f41a037ec6c77f7f5b8e2ca80"
+    },
+    "UniswapV4Quoter": {
+      "address": "0x4a6513c898fe1b2d0e78d3b0e0a4a151589b1cba"
+    },
+    "Permit2": {
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+    },
+    "UniversalRouter": {
+      "address": "0x492e6456d9528771018deb9e87ef7750ef184104"
+    }
+  },
+  "deploymentLog": {
+    "phase1Pulse": {
+      "txGasUsed": "1279361",
+      "gasPriceGwei": "0.011",
+      "ethCost": "0.000014072971"
+    },
+    "phase1Hook": {
+      "txGasUsed": "1000641",
+      "gasPriceGwei": "0.011",
+      "ethCost": "0.000011007051"
+    },
+    "totalEthSpent": "0.000025080022",
+    "deployerStartingBalance": "0.30",
+    "deployerRemainingBalance": "0.299990"
+  }
+}

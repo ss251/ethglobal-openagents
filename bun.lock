@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "pulse-protocol",
+      "dependencies": {
+        "viem": "^2.48.4",
+      },
     },
     "packages/agent": {
       "name": "@pulse/agent",

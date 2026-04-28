@@ -37,3 +37,4 @@ research/
 # Claude Code internal state
 .claude/scheduled_tasks.lock
 .claude/state/
+MNEMONIC.txt

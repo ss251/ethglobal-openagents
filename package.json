@@ -8,5 +8,8 @@
     "build": "bun --filter '*' build",
     "test": "forge test"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "viem": "^2.48.4"
+  }
 }

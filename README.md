@@ -224,7 +224,26 @@ contract changes.
 
 ## Status
 
-Initial scaffold complete. Tests: 17 passing
+### Deployed on Base Sepolia (chainId 84532)
+
+| Contract | Address | Explorer |
+| --- | --- | --- |
+| **Pulse** | `0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34` | [Basescan](https://sepolia.basescan.org/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34) |
+| **PulseGatedHook** | `0x137002596a3a818B36d82490cF79B35c376e8080` | [Basescan](https://sepolia.basescan.org/address/0x137002596a3a818B36d82490cF79B35c376e8080) |
+
+Hook permission flags = `0x0080` = `BEFORE_SWAP_FLAG` only (no NoOp surface,
+no `beforeSwapReturnDelta`). Mined via CREATE2 salt 57991.
+
+Wires into:
+- ERC-8004 IdentityRegistry `0x8004A818BFB912233c491871b3d84c89A494BD9e`
+- ERC-8004 ReputationRegistry `0x8004B663056A597Dffe9eCcC1965A193B7388713`
+- Uniswap v4 PoolManager `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408`
+
+Full deployment record (constructor args, gas, dependencies) at
+[`deployments/base-sepolia.json`](deployments/base-sepolia.json).
+
+### Tests: 17 passing
+
 - Pulse: commit, reveal-match, reveal-mismatch, reveal-too-early, expire,
   wrong-signer, non-owner reverts
 - PulseGatedHook: atomic-reveal swap, separate-reveal swap, missing
