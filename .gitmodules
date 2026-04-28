@@ -22,3 +22,12 @@
 [submodule "lib/solmate"]
 	path = lib/solmate
 	url = https://github.com/transmissions11/solmate
+[submodule ".claude/skills/uniswap-ai"]
+	path = .claude/skills/uniswap-ai
+	url = https://github.com/Uniswap/uniswap-ai.git
+[submodule "lib/uniswap-hooks"]
+	path = lib/uniswap-hooks
+	url = https://github.com/OpenZeppelin/uniswap-hooks
+[submodule ".claude/skills/0g-compute-skills"]
+	path = .claude/skills/0g-compute-skills
+	url = https://github.com/0gfoundation/0g-compute-skills.git
