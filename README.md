@@ -392,8 +392,9 @@ container under `hermes-sandbox/`. The plumbing is verified end-to-end:
 | Repo + `~/.hermes` bind-mounted into the container | ✓ `docker-compose.override.yml` mounts repo at `/workspace/ethglobal-openagents` |
 | Anthropic OAuth from Claude Code | ✓ `./auth.sh` reads the macOS Keychain entry `Claude Code-credentials` (filtered by `-a $USER` so it grabs the live entry, not a stale one from a prior install), drops the JSON at the doc-canonical path `~/.claude/.credentials.json` inside the container, and pins `model.provider: "anthropic"` in `config.yaml`. Hermes auto-seeds it into the Anthropic credential pool. |
 | Subscription routing (Pro/Max) | ✓ `auth.sh` also disables Hermes's heavyweight tool catalog (`web`, `browser`, `vision`, `image_gen`, `tts`, `session_search`, `clarify`, `delegation`, `cronjob`, `messaging`, `code_execution`, `memory`, `todo`) and empties `SOUL.md`. **Why:** Anthropic's Claude Pro/Max subscription quota is gated on per-request body size — a stock Hermes request with 27 tools (~35KB) gets billed via the "extra usage" pool and 402s with extra-usage off; a trimmed request (≤~23KB) routes to the subscription. Discovered by bisection on the live API. |
-| Live one-shot chat | ✓ `docker exec -it --user hermes hermes hermes -z "Reply with PONG" --provider anthropic -m claude-haiku-4-5` returns `PONG` cleanly. |
-| Pulse-bound prompt | ✓ Hermes was asked "query Pulse contract for commitment 4 status on Eth Sepolia"; agent used `terminal` tool to run `cast call ... getStatus(uint256)`, parsed the result, and answered correctly: **Status Found: 0 = Pending — committed but not yet revealed**. |
+| Live one-shot chat | ✓ `docker exec --user hermes hermes hermes -z "Reply with PONG" --provider anthropic -m claude-haiku-4-5` returns `PONG` cleanly. |
+| `skills` toolset stays **off** under Pro/Max | ⚠ Enabling it lets the LLM invoke pulse-skills by name, but the larger system prompt busts the body-size gate from the previous row and PONG starts hanging silently. Workaround: agents invoke skills' recipe-equivalent scripts via the `terminal` tool. See AUTH_NOTES.md, *Finding 3*. |
+| Pulse-bound prompt (terminal-tool path) | ✓ Hermes was asked to read the status of commitment #8 (the ENS-bound one) by running `bun run scripts/pulse-status.ts 8` via its terminal tool; agent parsed the output, identified `status=0 (Pending)` + `overdueExpired=true`, and correctly recommended an off-chain watcher call `Pulse.markExpired(8)` to lock in the `-500` ERC-8004 slash. |
 
 The wiring follows Hermes's `providers.md` recipe verbatim — Claude Code's
 credential store stays the single source of truth, no token copies into
@@ -404,13 +405,21 @@ credential store stays the single source of truth, no token copies into
 ./hermes-sandbox/auth.sh      # paste Claude Code OAuth from Keychain into Hermes
 ```
 
-Then issue a pulse-bound prompt:
+Then issue a pulse-bound prompt — note the terminal-tool path; under
+Pro/Max OAuth the agent doesn't invoke pulse-skills by name (Finding 3
+in AUTH_NOTES.md), it runs the recipe-equivalent scripts:
 
 ```bash
-docker exec -it --user hermes hermes hermes \
-  -z "Use the pulse-commit skill to commit agent 3906 to selling 0.01 pETH for at least 1800 pUSD on Eth Sepolia. Use a 30-second executeAfter and 10-minute reveal window." \
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
+  -z "Working dir: /workspace/ethglobal-openagents. Use the terminal tool to run 'bun run scripts/pulse-status.ts 8'. Status enum: 0=Pending, 1=Revealed, 2=Violated, 3=Expired. Note: status==0 with overdueExpired==true means the commitment is past revealDeadline but not yet markExpired'd — a watcher must call Pulse.markExpired(id). Report (a) status code + name, (b) reveal-window state, (c) action the watcher should take." \
   --provider anthropic -m claude-haiku-4-5
 ```
+
+The agent uses its `terminal` tool to run the script, parses the output,
+and produces the same answer a human operator would. With an Anthropic
+API key bound in addition to the OAuth token (`hermes auth add anthropic
+--type api-key …`), the body-size gate goes away and the LLM can invoke
+pulse-skills by name via Hermes's `skills` toolset — see AUTH_NOTES.md.
 
 ## Release history
 

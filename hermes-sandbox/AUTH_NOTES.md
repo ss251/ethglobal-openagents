@@ -1,9 +1,10 @@
 # Hermes ↔ Claude Code OAuth — debug notes
 
-Two non-obvious things bit us when wiring Claude Pro/Max OAuth into the
-sandboxed Hermes container. Both are fixed by `./auth.sh`; this file
-records *why* the script does what it does, so future readers don't have
-to repeat the bisection.
+Three non-obvious things bit us when wiring Claude Pro/Max OAuth into the
+sandboxed Hermes container. The first two are fixed by `./auth.sh`; the
+third is a usage rule (don't enable the `skills` toolset on Pro/Max).
+This file records *why* the script does what it does, so future readers
+don't have to repeat the bisection.
 
 ## Setup flow
 
@@ -90,6 +91,35 @@ If you need a tool that's been disabled, run
 writes a request dump on error, so a missing dump after a successful
 turn means you're under the gate.
 
+## Finding 3 — `skills` toolset can't be enabled under Pro/Max gating
+
+Pulse skills load fine in `hermes skills list` (all five show as
+`local`/`enabled`), but **the `skills` *toolset* itself is disabled by
+default** and re-enabling it on a Pro/Max OAuth session pushes the
+request body past the Finding-2 threshold. The symptom is
+*non-obvious*: the call hangs silently — even a plain "say PONG"
+prompt produces no output and no error — because Anthropic's 402 is
+returned mid-stream and Hermes' OAuth path swallows it.
+
+```bash
+# This breaks PONG under Pro/Max OAuth:
+docker exec --user hermes hermes hermes tools enable skills
+
+# Restoring it:
+docker exec --user hermes hermes hermes tools disable skills
+```
+
+The practical consequence: under Pro/Max OAuth, agents **cannot invoke
+pulse-skills by name via the SkillUse tool.** They use the `terminal`
+tool to run scripts that implement the skill's recipe instead. For a
+status check that's `bun run scripts/pulse-status.ts <id>`, etc.
+
+This is fine for the in-house Pulse demos (every skill has a paired TS
+script under `scripts/`), but worth knowing if you want the LLM to
+auto-discover skills from the `pulse-skills` bundle on a subscription
+account. Add a non-OAuth API key (see *Independent provider key* below)
+to escape the gate entirely.
+
 ## Independent provider key as a fallback
 
 Subscription gating only applies to OAuth tokens. A regular Anthropic
@@ -118,21 +148,32 @@ docker exec hermes bash -c 'cd /workspace/ethglobal-openagents && \
 ```
 
 This runs the full path: 0G qwen-2.5-7b-instruct generates reasoning →
-hash to `reasoningCID` → Pulse.commit on Base Sepolia. Last verified
-commit: `commitmentId 18`, tx `0x549887707efc28d0548e5ed0494ef2d62bf2110bf196551f2cd5e522cb3a4914`.
+hash to `reasoningCID` → Pulse.commit on Eth Sepolia (`commitmentId 6`,
+tx `0x810718ce64de40cece67f7c62776753dfa10a63778e4868dd9ac48ea08a0e713`
+in `deployments/sepolia.json` under `validatedFlows`).
 
 ## Verifying end-to-end
 
-A real Hermes → Pulse round trip on Base Sepolia (Claude Haiku 4.5 via
-the Max subscription, with trimmed tools):
+A real Hermes → Pulse round trip on Eth Sepolia, Claude Haiku 4.5 via
+the Max subscription, with trimmed tools:
 
 ```bash
-docker exec -it --user hermes hermes hermes \
-  -z "Run cast call --rpc-url \$BASE_SEPOLIA_RPC_URL 0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34 \"getStatus(uint256)(uint8)\" 16. Tell me which status (0=Pending, 1=Revealed, 2=Violated, 3=Expired)." \
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
+  -z "Working dir: /workspace/ethglobal-openagents. Use the terminal tool to run 'bun run scripts/pulse-status.ts 8'. Status enum: 0=Pending, 1=Revealed, 2=Violated, 3=Expired. Note: status==0 with overdueExpired==true means the commitment is past revealDeadline but not yet markExpired'd — a watcher must call Pulse.markExpired(id) to lock in status 3 and trigger the -500 ERC-8004 slash. Report (a) status code + name, (b) reveal-window state, (c) action the watcher should take." \
   --provider anthropic -m claude-haiku-4-5
 ```
 
-Expected output ends with the agent's interpretation of the cast call,
-e.g. `Status Found: 0 = Pending`. Confirmed working against
-commitment id 16 (the Trading-API-bound commitment from
-`scripts/phase8-tradingapi-demo.ts`).
+Two things `cast` users should know up front:
+
+- **`cast` is not installed in the upstream Hermes image.** `up.sh`
+  installs `bun` post-start; viem-via-bun is the supported path. If you
+  want `cast`, install `foundry` separately or write the agent prompt
+  to use `bun -e` / a script under `scripts/`.
+- **Confirmed working against `commitment id 8`** — the ENS-bound
+  commitment from `scripts/ens-bind-demo.ts`. Haiku invoked
+  `bun run scripts/pulse-status.ts 8` via its terminal tool, parsed
+  the output, and correctly recommended `markExpired(8)` once the
+  prompt clarified `overdueExpired` semantics. Without that semantic
+  hint, the smaller model interpreted `overdueExpired==true` as
+  "already expired, no action needed" — caller's job to disambiguate
+  in the prompt or move up to a stronger model.
