@@ -118,8 +118,8 @@ export async function runPulseBoundSwap(cfg: ScenarioConfig) {
 
     // 3. Quote the swap via Uniswap Trading API (V4-routed for hook compatibility)
     const quote = await quoteSwap({
-        tokenInChainId: 84532, // Eth Sepolia
-        tokenOutChainId: 84532,
+        tokenInChainId: 11155111, // Eth Sepolia
+        tokenOutChainId: 11155111,
         tokenIn: cfg.swap.tokenIn,
         tokenOut: cfg.swap.tokenOut,
         amount: cfg.swap.amountIn,

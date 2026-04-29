@@ -171,7 +171,7 @@ const publicClient = createPublicClient({chain: sepolia, transport: http(RPC)});
 const walletClient = createWalletClient({account: agent, chain: sepolia, transport: http(RPC)});
 
 console.log("══════════════════════════════════════════════════════════════════");
-console.log(" Pulse e2e commit-reveal driver — Eth Sepolia (chainId 84532)");
+console.log(" Pulse e2e commit-reveal driver — Eth Sepolia (chainId 11155111)");
 console.log("══════════════════════════════════════════════════════════════════");
 console.log(`  Pulse:           ${PULSE}`);
 console.log(`  Agent wallet:    ${agent.address}`);
