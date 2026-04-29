@@ -91,7 +91,7 @@ If you need a tool that's been disabled, run
 writes a request dump on error, so a missing dump after a successful
 turn means you're under the gate.
 
-## Finding 3 — `skills` toolset can't be enabled under Pro/Max gating
+## Finding 3 — `skills` toolset is body-gated on Pro/Max OAuth; API key lifts it
 
 Pulse skills load fine in `hermes skills list` (all five show as
 `local`/`enabled`), but **the `skills` *toolset* itself is disabled by
@@ -102,23 +102,51 @@ prompt produces no output and no error — because Anthropic's 402 is
 returned mid-stream and Hermes' OAuth path swallows it.
 
 ```bash
-# This breaks PONG under Pro/Max OAuth:
+# Under OAuth-only, this breaks even PONG:
 docker exec --user hermes hermes hermes tools enable skills
-
-# Restoring it:
-docker exec --user hermes hermes hermes tools disable skills
 ```
 
-The practical consequence: under Pro/Max OAuth, agents **cannot invoke
-pulse-skills by name via the SkillUse tool.** They use the `terminal`
-tool to run scripts that implement the skill's recipe instead. For a
-status check that's `bun run scripts/pulse-status.ts <id>`, etc.
+### Escape route — bind a non-OAuth API key alongside the OAuth credential
 
-This is fine for the in-house Pulse demos (every skill has a paired TS
-script under `scripts/`), but worth knowing if you want the LLM to
-auto-discover skills from the `pulse-skills` bundle on a subscription
-account. Add a non-OAuth API key (see *Independent provider key* below)
-to escape the gate entirely.
+A regular Anthropic API key (`sk-ant-api03-…`) doesn't go through the
+subscription-routing layer at all, so the body-size gate doesn't apply.
+Bind it once and Hermes' credential pool rotates to it whenever the
+OAuth token throws any pool error (rate-limit, refresh failure, the
+mysterious silent 402):
+
+```bash
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
+  auth add anthropic --type api-key --api-key sk-ant-api03-…
+
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes auth list
+# anthropic (2 credentials):
+#   #1  api-key-2            api_key manual ←
+#   #2  claude_code          oauth
+```
+
+With the API key in the pool, **`hermes tools enable skills` works**
+and the agent invokes pulse-skills by name via the SkillUse tool:
+
+```bash
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
+  -z "Use the pulse-status-check skill to read commitment id 8 on Eth Sepolia. …" \
+  --provider anthropic -m claude-haiku-4-5
+```
+
+Confirmed working: haiku-4-5 picks the skill, follows the SKILL.md
+recipe via viem, and surfaces the full provenance trail
+(`pulseagent.eth`, ERC-8004 #3906, signer provider, reasoning CID,
+`overdueExpired` ⇒ "watcher should call `markExpired(8)`") in one
+turn.
+
+### When OAuth-only is fine
+
+If you only need the agent to use `terminal` and `file` (no
+`skills` / `web` / `browser` / etc.), the trimmed-tools setup is
+strictly cheaper — the agent invokes recipe-equivalent scripts under
+`scripts/` (e.g. `bun run scripts/pulse-status.ts <id>`) instead of
+SkillUse. Both shapes are first-class. Reach for the API key only when
+you want the LLM to auto-discover and chain skills by name.
 
 ## Independent provider key as a fallback
 

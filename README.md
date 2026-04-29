@@ -393,8 +393,9 @@ container under `hermes-sandbox/`. The plumbing is verified end-to-end:
 | Anthropic OAuth from Claude Code | ✓ `./auth.sh` reads the macOS Keychain entry `Claude Code-credentials` (filtered by `-a $USER` so it grabs the live entry, not a stale one from a prior install), drops the JSON at the doc-canonical path `~/.claude/.credentials.json` inside the container, and pins `model.provider: "anthropic"` in `config.yaml`. Hermes auto-seeds it into the Anthropic credential pool. |
 | Subscription routing (Pro/Max) | ✓ `auth.sh` also disables Hermes's heavyweight tool catalog (`web`, `browser`, `vision`, `image_gen`, `tts`, `session_search`, `clarify`, `delegation`, `cronjob`, `messaging`, `code_execution`, `memory`, `todo`) and empties `SOUL.md`. **Why:** Anthropic's Claude Pro/Max subscription quota is gated on per-request body size — a stock Hermes request with 27 tools (~35KB) gets billed via the "extra usage" pool and 402s with extra-usage off; a trimmed request (≤~23KB) routes to the subscription. Discovered by bisection on the live API. |
 | Live one-shot chat | ✓ `docker exec --user hermes hermes hermes -z "Reply with PONG" --provider anthropic -m claude-haiku-4-5` returns `PONG` cleanly. |
-| `skills` toolset stays **off** under Pro/Max | ⚠ Enabling it lets the LLM invoke pulse-skills by name, but the larger system prompt busts the body-size gate from the previous row and PONG starts hanging silently. Workaround: agents invoke skills' recipe-equivalent scripts via the `terminal` tool. See AUTH_NOTES.md, *Finding 3*. |
-| Pulse-bound prompt (terminal-tool path) | ✓ Hermes was asked to read the status of commitment #8 (the ENS-bound one) by running `bun run scripts/pulse-status.ts 8` via its terminal tool; agent parsed the output, identified `status=0 (Pending)` + `overdueExpired=true`, and correctly recommended an off-chain watcher call `Pulse.markExpired(8)` to lock in the `-500` ERC-8004 slash. |
+| `skills` toolset under Pro/Max OAuth | ⚠ Enabling it busts the body-size gate from the previous row and even PONG starts hanging silently. **Escape:** bind a non-OAuth API key alongside the OAuth credential — `hermes auth add anthropic --type api-key --api-key sk-ant-api03-…`. The pool rotates to it on any OAuth-pool error and the gate is gone. With the key bound, `hermes tools enable skills` is fine. See AUTH_NOTES.md, *Finding 3*. |
+| Pulse-bound prompt — terminal-tool path *(OAuth-only)* | ✓ Hermes was asked to read commitment #8 (the ENS-bound one) by running `bun run scripts/pulse-status.ts 8` via its terminal tool; agent parsed the output, identified `status=0 (Pending)` + `overdueExpired=true`, and correctly recommended `Pulse.markExpired(8)` to lock in the `-500` slash. |
+| Pulse-bound prompt — **SkillUse by name** *(API key bound)* | ✓ Hermes was asked to "use the pulse-status-check skill on commitment id 8"; agent picked the skill, followed the SKILL.md recipe via viem, and surfaced the full provenance trail in one turn — `pulseagent.eth`, ERC-8004 #3906, signer `0xFFb8…CEee`, reasoning CID `0x243c40b2…`, status=`Pending`, window closed, recommend `markExpired(8)`. No prompt-side hint about `overdueExpired` semantics needed. |
 
 The wiring follows Hermes's `providers.md` recipe verbatim — Claude Code's
 credential store stays the single source of truth, no token copies into
@@ -403,11 +404,16 @@ credential store stays the single source of truth, no token copies into
 ```bash
 ./hermes-sandbox/up.sh        # build + start container
 ./hermes-sandbox/auth.sh      # paste Claude Code OAuth from Keychain into Hermes
+
+# Optional — bind a non-OAuth API key to escape the Pro/Max body-size gate
+# and let the agent invoke pulse-skills by name via Hermes's SkillUse tool.
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
+  auth add anthropic --type api-key --api-key sk-ant-api03-…
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes tools enable skills
 ```
 
-Then issue a pulse-bound prompt — note the terminal-tool path; under
-Pro/Max OAuth the agent doesn't invoke pulse-skills by name (Finding 3
-in AUTH_NOTES.md), it runs the recipe-equivalent scripts:
+**OAuth-only — terminal-tool path** (the agent runs scripts that
+implement each skill's recipe; cheap, no API key):
 
 ```bash
 docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
@@ -415,11 +421,19 @@ docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
   --provider anthropic -m claude-haiku-4-5
 ```
 
-The agent uses its `terminal` tool to run the script, parses the output,
-and produces the same answer a human operator would. With an Anthropic
-API key bound in addition to the OAuth token (`hermes auth add anthropic
---type api-key …`), the body-size gate goes away and the LLM can invoke
-pulse-skills by name via Hermes's `skills` toolset — see AUTH_NOTES.md.
+**API-key bound — SkillUse by name** (the agent picks `pulse-status-check`
+itself, follows its SKILL.md recipe; no prompt-side semantic hints):
+
+```bash
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
+  -z "Use the pulse-status-check skill to read the status of Pulse commitment id 8 on Eth Sepolia. Working directory: /workspace/ethglobal-openagents. PULSE_ADDRESS, SEPOLIA_RPC_URL are in .env. Run the skill end-to-end (don't just describe it). Report (a) the status enum + name, (b) whether the reveal window is still open, (c) what action an off-chain watcher should take next." \
+  --provider anthropic -m claude-haiku-4-5
+```
+
+Both shapes are first-class. The terminal-tool path is the right
+default for cost; the SkillUse path is the right shape when you want
+the LLM to auto-discover and chain pulse-skills (e.g. `pulse-status-check`
+→ `pulse-reveal` → `pulse-gated-swap`) without prompt scaffolding.
 
 ## Release history
 
