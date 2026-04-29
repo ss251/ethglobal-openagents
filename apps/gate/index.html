@@ -125,7 +125,7 @@ import { sepolia } from "https://esm.sh/viem@2.48.4/chains";
 const params = new URLSearchParams(location.search);
 const REPUTATION = "0x8004B663056A597Dffe9eCcC1965A193B7388713"; // canonical ERC-8004 ReputationRegistry
 const PULSE = params.get("pulse") || "0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34";
-const GATE = params.get("gate") || ""; // set after deploy via DeployGate.s.sol; falls back to direct registry read
+const GATE = params.get("gate") || "0x4d11e22268b8512B01dA7182a52Ba040A0709379"; // deployed PulseGatedGate on Eth Sepolia (v0.7.0)
 const DEFAULT_THRESHOLD = BigInt(params.get("threshold") || "50");
 const RPC = params.get("rpc") || "https://ethereum-sepolia-rpc.publicnode.com";
 

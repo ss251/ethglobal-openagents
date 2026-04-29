@@ -60,13 +60,19 @@ artifact a downstream protocol can clone. Two lines of contract code
 the entire consumption story. This is what gets handed to HeyElsa /
 Almanak / Olas in pre-submission DMs.
 
+### Deployed
+
+- **PulseGatedGate** on Eth Sepolia: [`0x4d11e22268b8512B01dA7182a52Ba040A0709379`](https://sepolia.etherscan.io/address/0x4d11e22268b8512B01dA7182a52Ba040A0709379)
+  — threshold=50, owner=`0x050F…`, reading the canonical 8004
+  ReputationRegistry filtered by `tag1="pulse"` and Pulse-as-client.
+
 ### Verified
 
 - `forge test` → 41/41 pass.
-- Live read: agent #3906 on Eth Sepolia returns APPROVED via the
-  deployed registry.
-- Frontend renders APPROVED + UNTRACKED states correctly (screenshots
-  in PR / submission demo).
+- Live read against the deployed gate: `gate(3906) → true`,
+  `threshold() → 50`. Frontend at `apps/gate/index.html` defaults to
+  the deployed address; `?agent=3906` renders **APPROVED**, agent
+  #999999 renders **UNTRACKED** correctly.
 
 ## [0.6.0] — 2026-04-29 — KeeperHub-deployable expirer
 

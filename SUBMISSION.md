@@ -66,6 +66,7 @@ always-on expirer daemon Pulse used to need.
 | **PulseGatedHook** | `0x274b3c0f55c2db8c392418649c1eb3aad1ecc080` | [Etherscan](https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080) |
 | **pUSD (mock)** | `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA` | [Etherscan](https://sepolia.etherscan.io/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA) |
 | **pWETH (mock)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Etherscan](https://sepolia.etherscan.io/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
+| **PulseGatedGate** | `0x4d11e22268b8512B01dA7182a52Ba040A0709379` | [Etherscan](https://sepolia.etherscan.io/address/0x4d11e22268b8512B01dA7182a52Ba040A0709379) |
 
 Wired to:
 - ERC-8004 IdentityRegistry `0x8004A818BFB912233c491871b3d84c89A494BD9e`
