@@ -18,4 +18,12 @@ contract MockReputationRegistry is IReputationRegistry {
     ) external {
         emit Recorded(agentId, value, tag1, tag2, feedbackHash);
     }
+
+    function getSummary(uint256, address[] calldata, string calldata, string calldata)
+        external
+        pure
+        returns (uint64, int128, uint8)
+    {
+        return (0, 0, 0);
+    }
 }

@@ -17,4 +17,16 @@ interface IReputationRegistry {
         string calldata feedbackURI,
         bytes32 feedbackHash
     ) external;
+
+    /// @notice Aggregates feedback values for `agentId` from the listed `clientAddresses`,
+    /// optionally filtered by tag1 / tag2 (empty string = no filter on that tag).
+    /// Reverts when `clientAddresses` is empty.
+    /// Returns the count of matching feedbacks, the average value scaled to mode decimals,
+    /// and the mode-decimals scaling factor itself.
+    function getSummary(
+        uint256 agentId,
+        address[] calldata clientAddresses,
+        string calldata tag1,
+        string calldata tag2
+    ) external view returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals);
 }

@@ -228,7 +228,7 @@ forge build
 forge test
 ```
 
-Should report **17 tests passing** (6 Pulse + 11 hook).
+Should report **41 tests passing** (6 Pulse + 11 PulseGatedHook + 10 PulseAgentINFT + 14 PulseGatedGate).
 
 Deploy Pulse to Eth Sepolia:
 
@@ -279,6 +279,8 @@ packages/
 hermes-sandbox/                     # Hermes (NousResearch) container wiring + SOUL.md persona
 keeperhub/                          # KeeperHub-deployable workflows + README (expirer infra)
 └── workflows/pulse-mark-expired.json
+apps/
+└── gate/                           # PulseGatedGate reference frontend (single static HTML)
 docs/
 └── adr/                            # architecture-decision records
 ai/diagrams/                        # Mermaid + Excalidraw architecture diagrams
@@ -471,7 +473,7 @@ hashes you can open in Etherscan.
 | `bun run scripts/ens-bind-demo.ts` | Binds 5 text records on `pulseagent.eth`, resolves them back via `pulseProvenanceFromENS()`, then submits a `Pulse.commit` whose `agentId` and `signerProvider` come *only* from ENS — proves ENS does real work in the agent identity stack. |
 | `bun run scripts/watch-and-slash.ts` | Long-running watcher service that does the rollback recovery automatically. |
 
-### Tests: 27 passing
+### Tests: 41 passing
 
 - **Pulse (6)**: commit, reveal-match, reveal-mismatch, reveal-too-early,
   expire, wrong-signer, non-owner reverts.
@@ -483,6 +485,9 @@ hashes you can open in Etherscan.
   binding, commitment-history append + clone-inheritance, authorize-usage,
   transfer with valid proof, signer-rotation owner-gate, ERC-165
   interfaces.
+- **PulseGatedGate (14)**: gate above/at/below threshold, untracked agent
+  rejection, assertGate revert paths, `checkAndLog` event emission, owner-
+  gated `setThreshold` + `setTag2Filter`, ctor invariants and immutables.
 
 ### Hermes integration — autonomous Pulse-bound trading agent in Telegram
 
@@ -580,6 +585,39 @@ was deleted in v0.2.0 because:
 
 The Hermes gateway is the canonical shape. We followed the docs.
 
+### PulseGatedGate — reference consumer for the read path
+
+Pulse without a consumer is a one-sided primitive. `PulseGatedGate.sol`
+is the smallest possible *read-side* integration: a ~110-line contract
+that reads ERC-8004 Pulse-tagged feedback through `getSummary` and
+returns approve/reject above a configurable threshold. Any protocol
+that wants "only let agents with positive Pulse rep through here" gets
+there with two lines:
+
+```solidity
+import {IPulseGate} from "./gates/PulseGatedGate.sol";
+IPulseGate(GATE).assertGate(agentId); // reverts if rep < threshold
+```
+
+Three surfaces:
+
+| Surface | File | Purpose |
+| --- | --- | --- |
+| Contract | [`contracts/gates/PulseGatedGate.sol`](contracts/gates/PulseGatedGate.sol) | Owner-tunable threshold, optional tag2 filter, view + revert + log variants |
+| Tests | [`test/PulseGatedGate.t.sol`](test/PulseGatedGate.t.sol) | 14 tests, `vm.mockCall` against the canonical ReputationRegistry |
+| Frontend | [`apps/gate/`](apps/gate/) | Single static HTML, viem from CDN, drop-and-serve |
+
+Verified live read-path against the deployed Eth Sepolia ReputationRegistry:
+agent #3906 (`pulseagent.eth`) returns `count=26 summaryValue=3423 decimals=2` →
+**APPROVED** at threshold 50. The frontend renders the verdict + on-chain
+links in <1s of click-to-paint. Deploy your own threshold + tag2 filter via
+[`script/DeployGate.s.sol`](script/DeployGate.s.sol).
+
+The point of this isn't "Pulse has a gate." It's that the *consumption
+story* is now load-bearing-real: a protocol team evaluating Pulse
+clones one file, sets two env vars, runs `forge script`, and gates
+their flow on Pulse reputation in an afternoon.
+
 ### KeeperHub integration — operator infrastructure as a workflow
 
 Pulse needs an off-chain expirer that calls `Pulse.markExpired(id)` on
@@ -615,7 +653,7 @@ Release notes live in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog
 format). Tagged releases with downloadable archives are mirrored to
 [GitHub Releases](https://github.com/ss251/ethglobal-openagents/releases).
 
-Latest: [v0.6.0 — KeeperHub-deployable expirer + zero-operator-infra story](CHANGELOG.md#060--2026-04-29--keeperhub-deployable-expirer).
+Latest: [v0.7.0 — PulseGatedGate: read-side reference consumer](CHANGELOG.md#070--2026-04-30--pulsegatedgate-the-read-side-reference-consumer).
 
 ## License
 

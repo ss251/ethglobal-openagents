@@ -52,7 +52,7 @@ always-on expirer daemon Pulse used to need.
 - **Spec**: [SPEC.md](SPEC.md)
 - **Integrating in 30 minutes**: [INTEGRATING.md](INTEGRATING.md)
 - **LLM-discoverable**: [llms.txt](llms.txt) + [llms-full.txt](llms-full.txt)
-- **Tests**: 27 forge tests passing (6 Pulse + 11 PulseGatedHook + 10 PulseAgentINFT)
+- **Tests**: 41 forge tests passing (6 Pulse + 11 PulseGatedHook + 10 PulseAgentINFT + 14 PulseGatedGate)
 
 ---
 
@@ -279,7 +279,7 @@ Pulse is shipped as a real consumable library, not a one-off demo:
 ```bash
 # 1. Tests still green
 forge test
-# expect: 27 passing (6 + 11 + 10)
+# expect: 41 passing (6 + 11 + 10 + 14)
 
 # 2. Sweep is idempotent (no stuck Pending left)
 bun run scripts/keeperhub-mark-expired.ts

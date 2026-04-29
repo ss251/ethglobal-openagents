@@ -9,6 +9,65 @@ GitHub Releases mirror this file; see
 <https://github.com/ss251/ethglobal-openagents/releases> for downloadable
 archives at each tag.
 
+## [0.7.0] — 2026-04-30 — PulseGatedGate: the read-side reference consumer
+
+The integration story up through v0.6.0 was supply-side complete (any
+agent can plug into Pulse to commit + reveal + slash). What was missing:
+the *read* side. A protocol team evaluating Pulse had to derive the
+"how do I gate my flow on Pulse rep?" answer themselves. v0.7.0 ships
+that answer as a single, cloneable artifact.
+
+### Added — the gate
+
+- **`contracts/gates/PulseGatedGate.sol`** — ~110-line reference
+  consumer. Reads canonical ERC-8004 `getSummary(agentId, [pulse],
+  "pulse", tag2Filter)` and exposes:
+  - `gate(agentId) → bool` (pure view — for frontends)
+  - `assertGate(agentId)` (revert variant — for one-line composition in
+    other contracts: `IPulseGate(GATE).assertGate(agentId)`)
+  - `checkAndLog(agentId)` (non-view, emits `GateChecked` for
+    indexers / The Graph)
+  - Owner-tunable `threshold` (`int128`) and optional `tag2Filter`
+    (e.g. only count "kept" feedbacks).
+  - Pinned to a single client (Pulse contract) so a malicious party
+    can't farm fake `tag1="pulse"` feedback under another address.
+- **`test/PulseGatedGate.t.sol`** — 14 tests, all `vm.mockCall`-driven
+  against the registry interface so the suite stays unit-isolated.
+  Covers passes/fails at threshold boundary, untracked-agent rejection,
+  emission shape, owner gates, ctor invariants. Total suite: **41/41
+  passing** (was 27).
+- **`script/DeployGate.s.sol`** — Foundry deploy script. Defaults to
+  the canonical Eth Sepolia ReputationRegistry + Pulse address;
+  override via `REPUTATION_REGISTRY` / `PULSE_ADDRESS` /
+  `GATE_THRESHOLD` / `GATE_OWNER` env vars.
+- **`apps/gate/`** — single static HTML reference frontend. viem from
+  `esm.sh` CDN, no build step, no `package.json`. Drop-and-serve. URL
+  params for `agent`, `gate`, `pulse`, `threshold`, `rpc`. Reads either
+  the deployed `PulseGatedGate` (for threshold + tag2 config) or the
+  registry directly. Verified end-to-end against the live deployment:
+  `?agent=3906` (`pulseagent.eth`) renders **APPROVED** with
+  `count=26 summaryValue=3423 decimals=2` against `threshold=50`.
+- **README** + **CHANGELOG** updated with the gate section, repo
+  layout entry, and the bumped 41-test count.
+
+### Why this matters
+
+Per Grok's pre-submission pressure test, the load-bearing concern for
+Pulse's defensibility was always: "great supply-side primitive, but
+will anyone read?" v0.7.0 answers that with the smallest possible
+artifact a downstream protocol can clone. Two lines of contract code
+(`IPulseGate(GATE).assertGate(agentId)`) and one static HTML page is
+the entire consumption story. This is what gets handed to HeyElsa /
+Almanak / Olas in pre-submission DMs.
+
+### Verified
+
+- `forge test` → 41/41 pass.
+- Live read: agent #3906 on Eth Sepolia returns APPROVED via the
+  deployed registry.
+- Frontend renders APPROVED + UNTRACKED states correctly (screenshots
+  in PR / submission demo).
+
 ## [0.6.0] — 2026-04-29 — KeeperHub-deployable expirer
 
 The expirer was Pulse's last piece of always-on operator infrastructure:

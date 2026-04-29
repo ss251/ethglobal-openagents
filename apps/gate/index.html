@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pulse Gate — reference reputation gate for onchain agents</title>
+<meta name="description" content="The reference consumer of Pulse reputation. Paste an ERC-8004 agent id and see whether they pass the Pulse-tagged feedback threshold." />
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --fg: #f5f5f5;
+    --muted: #888;
+    --border: #1f1f1f;
+    --card: #111;
+    --green: #1aa860;
+    --green-bg: #0c2e1c;
+    --red: #d74545;
+    --red-bg: #2e1010;
+    --accent: #6b8eff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 15px/1.55 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+    background: var(--bg);
+    color: var(--fg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px;
+  }
+  .wrap { max-width: 760px; width: 100%; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .lede { color: var(--muted); margin: 0 0 28px; }
+  .lede a { color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent); }
+  form { display: flex; gap: 8px; margin-bottom: 24px; }
+  input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 14px 16px;
+    border-radius: 10px;
+    font: inherit;
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  button {
+    background: var(--fg);
+    color: var(--bg);
+    border: 0;
+    padding: 0 20px;
+    border-radius: 10px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .banner {
+    padding: 28px 24px;
+    border-radius: 16px;
+    text-align: left;
+    margin-bottom: 16px;
+    border: 1px solid;
+  }
+  .banner.approved { background: var(--green-bg); border-color: var(--green); }
+  .banner.rejected { background: var(--red-bg); border-color: var(--red); }
+  .banner.untracked { background: #181818; border-color: var(--border); }
+  .verdict { font-size: 22px; font-weight: 600; }
+  .approved .verdict { color: var(--green); }
+  .rejected .verdict { color: var(--red); }
+  .untracked .verdict { color: var(--muted); }
+  dl { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; margin: 16px 0 0; }
+  dt { color: var(--muted); }
+  dd { margin: 0; word-break: break-all; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 18px 20px;
+    border-radius: 12px;
+    margin-top: 12px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .links a { color: var(--accent); text-decoration: none; margin-right: 16px; }
+  .links a:hover { text-decoration: underline; }
+  .status { color: var(--muted); margin-top: 16px; font-size: 13px; }
+  .err { color: var(--red); margin-top: 12px; font-size: 13px; }
+  footer { margin-top: 60px; color: var(--muted); font-size: 12px; }
+  footer a { color: var(--muted); }
+  code { background: #161616; padding: 1px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pulse Gate</h1>
+  <p class="lede">
+    Reference consumer of Pulse reputation. Reads <a href="https://github.com/erc-8004/erc-8004-contracts" target="_blank" rel="noopener">ERC-8004</a>
+    feedback tagged <code>"pulse"</code> via the canonical
+    <code>getSummary</code>. Threshold-gated. Any protocol can clone this in an afternoon.
+  </p>
+
+  <form id="f">
+    <input id="agentId" type="text" inputmode="numeric" placeholder="ERC-8004 agent id (e.g. 3906)" autofocus />
+    <button id="check" type="submit">Check Gate</button>
+  </form>
+
+  <div id="result" hidden></div>
+  <div id="status" class="status"></div>
+  <div id="err" class="err"></div>
+
+  <footer>
+    Pulse — sealed agent commitments.
+    <a href="https://github.com/ss251/ethglobal-openagents" target="_blank" rel="noopener">github</a> ·
+    <a href="https://sepolia.app.ens.domains/pulseagent.eth" target="_blank" rel="noopener">pulseagent.eth</a>
+  </footer>
+</div>
+
+<script type="module">
+import { createPublicClient, http, parseAbi } from "https://esm.sh/viem@2.48.4";
+import { sepolia } from "https://esm.sh/viem@2.48.4/chains";
+
+// ─── Deploy targets ────────────────────────────────────────────────────
+// Eth Sepolia. Override via URL params: ?gate=0x...&pulse=0x...&threshold=50
+const params = new URLSearchParams(location.search);
+const REPUTATION = "0x8004B663056A597Dffe9eCcC1965A193B7388713"; // canonical ERC-8004 ReputationRegistry
+const PULSE = params.get("pulse") || "0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34";
+const GATE = params.get("gate") || ""; // set after deploy via DeployGate.s.sol; falls back to direct registry read
+const DEFAULT_THRESHOLD = BigInt(params.get("threshold") || "50");
+const RPC = params.get("rpc") || "https://ethereum-sepolia-rpc.publicnode.com";
+
+const REGISTRY_ABI = parseAbi([
+  "function getSummary(uint256 agentId, address[] clientAddresses, string tag1, string tag2) view returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals)",
+]);
+const GATE_ABI = parseAbi([
+  "function gate(uint256 agentId) view returns (bool)",
+  "function threshold() view returns (int128)",
+  "function tag2Filter() view returns (string)",
+]);
+
+const client = createPublicClient({ chain: sepolia, transport: http(RPC) });
+
+const $f = document.getElementById("f");
+const $agentId = document.getElementById("agentId");
+const $result = document.getElementById("result");
+const $status = document.getElementById("status");
+const $err = document.getElementById("err");
+const $btn = document.getElementById("check");
+
+// Pre-fill from URL
+if (params.get("agent")) $agentId.value = params.get("agent");
+
+$f.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $err.textContent = "";
+  $result.hidden = true;
+  const idStr = $agentId.value.trim();
+  if (!idStr || !/^\d+$/.test(idStr)) {
+    $err.textContent = "Enter a numeric ERC-8004 agent id.";
+    return;
+  }
+  const agentId = BigInt(idStr);
+  $btn.disabled = true;
+  $status.textContent = "Reading ReputationRegistry on Eth Sepolia…";
+  try {
+    let threshold = DEFAULT_THRESHOLD;
+    let tag2 = "";
+    if (GATE) {
+      try {
+        const [t, tag] = await Promise.all([
+          client.readContract({ address: GATE, abi: GATE_ABI, functionName: "threshold" }),
+          client.readContract({ address: GATE, abi: GATE_ABI, functionName: "tag2Filter" }),
+        ]);
+        threshold = BigInt(t);
+        tag2 = tag;
+      } catch (gateErr) {
+        $status.textContent = "Gate not reachable, falling back to direct registry read with default threshold.";
+      }
+    }
+    const [count, summaryValue, summaryDec] = await client.readContract({
+      address: REPUTATION,
+      abi: REGISTRY_ABI,
+      functionName: "getSummary",
+      args: [agentId, [PULSE], "pulse", tag2],
+    });
+    const score = BigInt(summaryValue);
+    const tracked = count > 0n;
+    const approved = tracked && score >= threshold;
+    render({ agentId, count, score, summaryDec, threshold, tag2, approved, tracked });
+    $status.textContent = "";
+  } catch (rpcErr) {
+    $err.textContent = "RPC error: " + (rpcErr?.shortMessage || rpcErr?.message || String(rpcErr)).slice(0, 200);
+    $status.textContent = "";
+  } finally {
+    $btn.disabled = false;
+  }
+});
+
+function render({ agentId, count, score, summaryDec, threshold, tag2, approved, tracked }) {
+  const klass = !tracked ? "untracked" : approved ? "approved" : "rejected";
+  const verdict = !tracked
+    ? "UNTRACKED — no Pulse-tagged feedback yet"
+    : approved
+      ? "APPROVED — passes Pulse gate"
+      : "REJECTED — below threshold";
+  $result.className = "banner " + klass;
+  $result.innerHTML = `
+    <div class="verdict">${verdict}</div>
+    <dl>
+      <dt>agent id</dt><dd>${agentId.toString()}</dd>
+      <dt>pulse score</dt><dd>${score.toString()} <span style="color:var(--muted)">(${count} feedback${count === 1n ? "" : "s"}, decimals ${summaryDec})</span></dd>
+      <dt>threshold</dt><dd>${threshold.toString()}${tag2 ? ` <span style="color:var(--muted)">(filtered to tag2="${tag2}")</span>` : ""}</dd>
+    </dl>
+    <div class="card links">
+      <h3>verify on chain</h3>
+      <a href="https://sepolia.etherscan.io/address/${REPUTATION}#readContract" target="_blank" rel="noopener">ReputationRegistry on Etherscan</a>
+      <a href="https://sepolia.etherscan.io/address/${PULSE}" target="_blank" rel="noopener">Pulse on Etherscan</a>
+      ${GATE ? `<a href="https://sepolia.etherscan.io/address/${GATE}" target="_blank" rel="noopener">Gate on Etherscan</a>` : ""}
+      <a href="https://8004scan.io" target="_blank" rel="noopener">8004scan.io</a>
+    </div>
+  `;
+  $result.hidden = false;
+}
+</script>
+</body>
+</html>

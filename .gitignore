@@ -38,3 +38,5 @@ research/
 .claude/scheduled_tasks.lock
 .claude/state/
 MNEMONIC.txt
+
+.tmp/
