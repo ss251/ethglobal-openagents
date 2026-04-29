@@ -11,7 +11,8 @@
 [![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
 [![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
 [![Tests](https://img.shields.io/badge/forge%20test-17%2F17-brightgreen?style=flat-square)](#tests-17-passing)
-[![Release](https://img.shields.io/badge/release-v0.1.0-orange?style=flat-square)](#release-history)
+[![Release](https://img.shields.io/badge/release-v0.1.1-orange?style=flat-square)](#release-history)
+[![ENS](https://img.shields.io/badge/ENS-pulseagent.eth-5298ff?style=flat-square)](https://sepolia.app.ens.domains/pulseagent.eth)
 
 ```mermaid
 flowchart TD
@@ -20,7 +21,7 @@ flowchart TD
         direction LR
         Hermes["<b>Hermes container</b><br/>Nous Research<br/>Claude Max via OAuth"]
         Skills["<b>pulse-skills bundle</b><br/>SKILL.md × 5"]
-        Agent(["<b>Agent EOA</b><br/>0x30cB…397c<br/>ERC-8004 #3906"])
+        Agent(["<b>Agent EOA</b><br/>pulseagent.eth<br/>0x30cB…397c · ERC-8004 #3906"])
         ZG["<b>0G Compute</b><br/>TEE-attested qwen-2.5-7b<br/>provider 0xa48f…"]
         Trade["<b>Uniswap Trading API</b><br/>/v1/quote · DUTCH_V2"]
     end
@@ -90,7 +91,7 @@ flowchart TD
 
 > **Quick start.** `forge build && forge test` for the contracts;
 > `bun run scripts/e2e-commit-reveal.ts` for the full commit / reveal /
-> violated / expired flow on Eth Sepolia. Six end-to-end scripts under
+> violated / expired flow on Eth Sepolia. Seven end-to-end scripts under
 > [`scripts/`](scripts/) cover every load-bearing flow — see
 > [Live demos on Eth Sepolia](#live-demos-on-eth-sepolia).
 >
@@ -219,8 +220,8 @@ Deploy Pulse to Eth Sepolia:
 
 ```bash
 export PRIVATE_KEY=0x...
-export BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
-forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast
+export SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+forge script script/Deploy.s.sol --rpc-url sepolia --broadcast
 ```
 
 Deploy `PulseGatedHook` against a v4 PoolManager:
@@ -228,7 +229,7 @@ Deploy `PulseGatedHook` against a v4 PoolManager:
 ```bash
 export POOL_MANAGER=0x...        # v4 PoolManager on the target chain
 export PULSE=0x...               # the Pulse address from the previous step
-forge script script/DeployHook.s.sol --rpc-url base_sepolia --broadcast
+forge script script/DeployHook.s.sol --rpc-url sepolia --broadcast
 ```
 
 The deploy script CREATE2-mines a salt that produces a hook address with the required `BEFORE_SWAP_FLAG` bits in its lower 14 bits. Override the registry defaults via `IDENTITY_REGISTRY` / `REPUTATION_REGISTRY` env vars for other chains.
@@ -324,10 +325,10 @@ contract changes.
 
 | Contract | Address | Explorer |
 | --- | --- | --- |
-| **Pulse** | `0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34` | [Basescan](https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34) |
-| **PulseGatedHook** | `0x274b3c0f55c2db8c392418649c1eb3aad1ecc080` | [Basescan](https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080) |
-| **Pulse Mock USD (`pUSD`)** | `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA` | [Basescan](https://sepolia.etherscan.io/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA) |
-| **Pulse Mock WETH (`pWETH`)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Basescan](https://sepolia.etherscan.io/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
+| **Pulse** | `0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34` | [Etherscan](https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34) |
+| **PulseGatedHook** | `0x274b3c0f55c2db8c392418649c1eb3aad1ecc080` | [Etherscan](https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080) |
+| **Pulse Mock USD (`pUSD`)** | `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA` | [Etherscan](https://sepolia.etherscan.io/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA) |
+| **Pulse Mock WETH (`pWETH`)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Etherscan](https://sepolia.etherscan.io/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
 
 Pool: `pUSD ↔ pWETH`, fee `0.3%`, tickSpacing 60, initialized at 1:1 with a
 wide-range LP position via `script/Phase2.s.sol`.
@@ -341,13 +342,22 @@ Wires into:
 - Uniswap v4 PoolManager `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`
 - 0G Compute provider `0xa48f01287233509FD694a22Bf840225062E67836` (qwen-2.5-7b-instruct, TEE-attested proxy)
 
+**Agent identity (ENS).** [`pulseagent.eth`](https://sepolia.app.ens.domains/pulseagent.eth)
+on Sepolia ENS is the human-readable handle for the agent. Five text records
+(`agentId`, `signerProvider`, `pulseHistory`, `description`, `avatar`) are
+bound via the Public Resolver, so downstream tooling can take just the name
+and resolve `(addr, agentId, TEE signer)` without ever reading the `.env`.
+The `pulseProvenanceFromENS()` helper in `@pulse/sdk` does exactly that, and
+`scripts/ens-bind-demo.ts` exercises it end-to-end (writes records, resolves
+back, commits via Pulse using only ENS-resolved data).
+
 Full deployment record (constructor args, gas, dependencies) at
 [`deployments/sepolia.json`](deployments/sepolia.json).
 
 ### Live demos on Eth Sepolia
 
-Six end-to-end scripts exercise the deployed contracts; each prints tx
-hashes you can open in Basescan.
+Seven end-to-end scripts exercise the deployed contracts; each prints tx
+hashes you can open in Etherscan.
 
 | Script | What it proves |
 | --- | --- |
@@ -356,6 +366,7 @@ hashes you can open in Basescan.
 | `bun run scripts/violation-and-rollback-demo.ts` | The atomic-reveal rollback gap is real (status returns to Pending after the cheating-swap revert), and the off-chain watcher closes it by calling `Pulse.reveal` directly to lock in `Violated`. |
 | `bun run scripts/sealed-inference-demo.ts` | A 0G-attested qwen reasoning blob is hashed into `reasoningCID` and anchored on chain in a real Pulse commitment. |
 | `bun run scripts/phase8-tradingapi-demo.ts` | A live Uniswap Trading API quote (mainnet UniswapX DUTCH_V2, real liquidity) is normalized into `intentHash`+`reasoningCID` and committed on Eth Sepolia. The commitment carries the quote's `requestId` so anyone can re-pull and verify. |
+| `bun run scripts/ens-bind-demo.ts` | Binds 5 text records on `pulseagent.eth`, resolves them back via `pulseProvenanceFromENS()`, then submits a `Pulse.commit` whose `agentId` and `signerProvider` come *only* from ENS — proves ENS does real work in the agent identity stack. |
 | `bun run scripts/watch-and-slash.ts` | Long-running watcher service that does the rollback recovery automatically. |
 
 ### Tests: 17 passing
@@ -403,6 +414,41 @@ docker exec -it --user hermes hermes hermes \
 
 ## Release history
 
+### Unreleased — ENS Track 1 deliverable *(2026-04-29)*
+
+Builds on `v0.1.1`. Will be tagged `v0.1.2` after one more polish pass.
+
+- **`pulseagent.eth` registered** on Sepolia ENS, owned by the agent EOA
+  ([`0x30cB…397c`](https://sepolia.etherscan.io/address/0x30cB0080bFE9bB98d900726Fd3012175ee3D397c)).
+  Five text records (`agentId`, `signerProvider`, `pulseHistory`,
+  `description`, `avatar`) bound via the Public Resolver
+  [`0xE99638b4…E49b5`](https://sepolia.etherscan.io/address/0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5).
+- **`scripts/ens-bind-demo.ts`** — writes the records, resolves them back
+  via `pulseProvenanceFromENS()`, then submits Pulse commitment **#8**
+  using only ENS-resolved data. No hard-coded `agentId` or `signerProvider`
+  in the commit path. Tx
+  [`0xf36ff751…65ae`](https://sepolia.etherscan.io/tx/0xf36ff751fd35a719721bc7282eaf6dc1c51c69f8690481ea332bb2a8ef9565ae).
+- **`@pulse/sdk` exports**: `setAgentENSRecords`, `pulseProvenanceFromENS`,
+  `resolveAgentByENS` for downstream agents that want to bootstrap from a
+  name instead of an env file.
+
+### v0.1.1 — Eth Sepolia migration *(2026-04-29)*
+
+The whole stack moves from Base Sepolia to Eth Sepolia (chainId 11155111)
+to align with the ENS sponsor track and to put Pulse, ERC-8004, the v4
+hook, and ENS on the same chain — no cross-chain bridging required.
+
+- **Same deterministic addresses for `Pulse.sol`** (deployer + nonce
+  unchanged → CREATE collision-free); the v4 hook re-mined a salt against
+  Eth Sepolia's PoolManager and landed at
+  [`0x274b…c080`](https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080).
+- **Agent ERC-8004 #3906** registered against the canonical IdentityRegistry
+  on Eth Sepolia.
+- **All five validated flows re-run on Eth Sepolia.**
+  `e2e-commit-reveal`, `exercise-gated-swap`, `violation-and-rollback-demo`,
+  `sealed-inference-demo`, `phase8-tradingapi-demo` — each with fresh
+  Etherscan-verifiable tx hashes recorded in `deployments/sepolia.json`.
+
 ### v0.1.0 — ETHGlobal Open Agents 2026 submission *(2026-04-29)*
 
 Initial protocol drop. Tagged so graders can pin to a specific commit.
@@ -413,7 +459,7 @@ Initial protocol drop. Tagged so graders can pin to a specific commit.
   with mocks `pUSD` + `pWETH` and a wide-range LP position via `script/Phase2.s.sol`.
 - **Six live demos.** `e2e-commit-reveal`, `exercise-gated-swap`,
   `violation-and-rollback-demo`, `sealed-inference-demo`, `phase8-tradingapi-demo`,
-  `watch-and-slash`. Each prints tx hashes you can open in Basescan.
+  `watch-and-slash`. Each prints tx hashes you can open in Etherscan.
 - **17 tests passing.** Pulse + PulseGatedHook with the real `Deployers` /
   `HookTest` utilities from v4-core / uniswap-hooks.
 - **Hermes integration verified end-to-end.** Agent prompt → Pulse contract
