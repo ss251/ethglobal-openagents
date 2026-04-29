@@ -2,18 +2,45 @@
 
 Three non-obvious things bit us when wiring Claude Pro/Max OAuth into the
 sandboxed Hermes container. The first two are fixed by `./auth.sh`; the
-third is a usage rule (don't enable the `skills` toolset on Pro/Max).
-This file records *why* the script does what it does, so future readers
-don't have to repeat the bisection.
+third is a usage rule (don't enable the `skills` toolset on Pro/Max
+OAuth alone — but binding a non-OAuth API key alongside lifts the rule
+entirely; see Finding 3). This file records *why* the script does what
+it does, so future readers don't have to repeat the bisection.
 
-## Setup flow
+## Canonical setup flow (v0.2.0+)
 
 ```bash
-./up.sh        # build + start container, install bun
-./auth.sh      # paste Claude Code OAuth + trim tools for subscription routing
-docker exec -it --user hermes hermes hermes \
-  -z "<your prompt>" --provider anthropic -m claude-haiku-4-5
+./up.sh        # build + start container; gateway auto-starts as entrypoint
+./auth.sh      # paste Claude Code OAuth + install pulseagent persona
+
+# Bind a non-OAuth Anthropic API key so the agent can invoke pulse-skills
+# by name (skills toolset would otherwise bust the OAuth body-size gate
+# and hang silently — see Finding 3):
+docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
+  auth add anthropic --type api-key --api-key sk-ant-api03-...
+
+# Configure the Telegram bot (read by hermes gateway automatically):
+docker exec --user hermes bash -c '
+  echo TELEGRAM_BOT_TOKEN=<from-BotFather> >> /opt/data/.env
+  echo TELEGRAM_ALLOWED_USERS=<your-numeric-user-id> >> /opt/data/.env
+'
+docker restart hermes  # gateway picks up new env on next entrypoint run
 ```
+
+After that, talk to `@<your-bot>` in Telegram — Hermes gateway is the
+entrypoint of the container, so it's already polling and ready. Try:
+> sell 0.01 pETH for at least 1800 pUSD
+
+The agent loads the `pulse-autonomous-trade` skill, runs
+`scripts/autonomous-trade.ts` via the `terminal` tool, narrates the
+commit → wait → atomic-reveal swap cycle in the chat with clickable
+Etherscan + ENS links.
+
+The earlier `hermes -z "<prompt>"` one-shot pattern (and the standalone
+`scripts/telegram-pulse-bot.ts` polling shim) are gone in v0.2.0 —
+neither survives switching to Hermes' native gateway, which provides
+persistent sessions, voice memos, group support, and skill auto-load
+out of the box.
 
 ## Finding 1 — Multiple Keychain entries; default lookup picks a stale one
 
@@ -182,26 +209,27 @@ in `deployments/sepolia.json` under `validatedFlows`).
 
 ## Verifying end-to-end
 
-A real Hermes → Pulse round trip on Eth Sepolia, Claude Haiku 4.5 via
-the Max subscription, with trimmed tools:
+The canonical demo from v0.2.0 onward is **chat-driven via Telegram**, not a one-shot CLI invocation. Open Telegram → `@<your-bot>` → message:
 
-```bash
-docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
-  -z "Working dir: /workspace/ethglobal-openagents. Use the terminal tool to run 'bun run scripts/pulse-status.ts 8'. Status enum: 0=Pending, 1=Revealed, 2=Violated, 3=Expired. Note: status==0 with overdueExpired==true means the commitment is past revealDeadline but not yet markExpired'd — a watcher must call Pulse.markExpired(id) to lock in status 3 and trigger the -500 ERC-8004 slash. Report (a) status code + name, (b) reveal-window state, (c) action the watcher should take." \
-  --provider anthropic -m claude-haiku-4-5
-```
+> sell 0.01 pETH for at least 1800 pUSD
 
-Two things `cast` users should know up front:
+Hermes:
 
-- **`cast` is not installed in the upstream Hermes image.** `up.sh`
-  installs `bun` post-start; viem-via-bun is the supported path. If you
-  want `cast`, install `foundry` separately or write the agent prompt
-  to use `bun -e` / a script under `scripts/`.
-- **Confirmed working against `commitment id 8`** — the ENS-bound
-  commitment from `scripts/ens-bind-demo.ts`. Haiku invoked
-  `bun run scripts/pulse-status.ts 8` via its terminal tool, parsed
-  the output, and correctly recommended `markExpired(8)` once the
-  prompt clarified `overdueExpired` semantics. Without that semantic
-  hint, the smaller model interpreted `overdueExpired==true` as
-  "already expired, no action needed" — caller's job to disambiguate
-  in the prompt or move up to a stronger model.
+1. Routes the message to the persistent session for your `chat_id` (sessions live at `/opt/data/sessions/`, FTS5-indexed via SQLite).
+2. Loads the `pulse-autonomous-trade` skill via SkillUse (the API-key path; see Finding 3).
+3. Calls `bun run scripts/autonomous-trade.ts --direction sell --base-amount 0.01 --min-price 1800 --execute-after 30` via the `terminal` tool.
+4. The script runs the full reason → commit → wait → atomic-reveal cycle on Eth Sepolia, prints progress to stderr, emits a single JSON object to stdout.
+5. Hermes parses the JSON and replies in the chat with clickable Etherscan + ENS links.
+
+For the force-drift demo (the rhetorical hammer):
+
+> Now drift the agent — execute a swap with different params
+
+Hermes runs `scripts/force-drift.ts`; the v4 hook reverts the drifted swap pre-state-change; the watcher closes the rollback gap with a direct `Pulse.reveal(drifted)`; the commitment goes Violated; the agent gets slashed -1000 ERC-8004 reputation. All visible inline.
+
+**Why this shape is the right one** (vs the older `hermes -z` polling shim):
+
+- Native Telegram persistence — sessions, voice memos, group chats, slash commands, model picker (`/model`), reset (`/new`) all work for free.
+- Cron, memory, todo, clarify tools available — agent can actually live as a long-running process, schedule autonomous portfolio checks, remember user context across sessions.
+- Skill auto-load by `/skill-name` slash command, or by name in natural-language requests.
+- One source of truth for env: `/opt/data/.env` is what `hermes gateway` reads. No host/container env mirror dance.

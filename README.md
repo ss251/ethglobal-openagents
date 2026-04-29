@@ -11,7 +11,8 @@
 [![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
 [![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
 [![Tests](https://img.shields.io/badge/forge%20test-17%2F17-brightgreen?style=flat-square)](#tests-17-passing)
-[![Release](https://img.shields.io/badge/release-v0.1.1-orange?style=flat-square)](#release-history)
+[![Release](https://img.shields.io/badge/release-v0.2.0-orange?style=flat-square)](#release-history)
+[![Hermes](https://img.shields.io/badge/Hermes-Telegram%20gateway-7d5fff?style=flat-square)](https://hermes-agent.nousresearch.com/)
 [![ENS](https://img.shields.io/badge/ENS-pulseagent.eth-5298ff?style=flat-square)](https://sepolia.app.ens.domains/pulseagent.eth)
 
 ```mermaid
@@ -378,68 +379,168 @@ hashes you can open in Etherscan.
   hookData, expired status, separate-mismatch-locks-Violated, double-spend
   edge case
 
-### Hermes integration
+### Hermes integration — autonomous Pulse-bound trading agent in Telegram
 
-The pulse-skills bundle is loaded into a sandboxed
+`pulseagent.eth` runs as an autonomous trading agent inside a sandboxed
 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
-container under `hermes-sandbox/`. The plumbing is verified end-to-end:
+container. You **chat with it in Telegram**. The agent has a persona
+(`hermes-sandbox/SOUL.md`), a wallet (the agent EOA, ERC-8004 #3906),
+six pulse-skills loaded by name via SkillUse, and the full Hermes tool
+catalog enabled (memory, cronjob, todo, clarify, terminal, file,
+skills). The container's entrypoint is `hermes gateway run` — the
+gateway polls Telegram, persists sessions per `chat_id` in SQLite,
+auto-routes voice memos through Whisper, and invokes pulse-skills
+exactly like Hermes' own bundled skills.
 
-| Layer | Status |
+#### Demo prompts (sent to `@<your-bot>` in Telegram)
+
+| Prompt | What the agent does |
 | --- | --- |
-| Hermes container builds + starts | ✓ `./hermes-sandbox/up.sh` (image: `hermes-agent`, dashboard on :9119) |
-| All 5 pulse skills loaded as `local`/`enabled` | ✓ `hermes skills list` lists `pulse-commit`, `pulse-reveal`, `pulse-status-check`, `pulse-gated-swap`, `sealed-inference-with-pulse` |
-| Skill runtime (`bun` + viem + `.env`) inside container | ✓ `up.sh` installs `bun` post-start; `bun run scripts/exercise-gated-swap.ts` runs from inside the container against Eth Sepolia |
-| Repo + `~/.hermes` bind-mounted into the container | ✓ `docker-compose.override.yml` mounts repo at `/workspace/ethglobal-openagents` |
-| Anthropic OAuth from Claude Code | ✓ `./auth.sh` reads the macOS Keychain entry `Claude Code-credentials` (filtered by `-a $USER` so it grabs the live entry, not a stale one from a prior install), drops the JSON at the doc-canonical path `~/.claude/.credentials.json` inside the container, and pins `model.provider: "anthropic"` in `config.yaml`. Hermes auto-seeds it into the Anthropic credential pool. |
-| Subscription routing (Pro/Max) | ✓ `auth.sh` also disables Hermes's heavyweight tool catalog (`web`, `browser`, `vision`, `image_gen`, `tts`, `session_search`, `clarify`, `delegation`, `cronjob`, `messaging`, `code_execution`, `memory`, `todo`) and empties `SOUL.md`. **Why:** Anthropic's Claude Pro/Max subscription quota is gated on per-request body size — a stock Hermes request with 27 tools (~35KB) gets billed via the "extra usage" pool and 402s with extra-usage off; a trimmed request (≤~23KB) routes to the subscription. Discovered by bisection on the live API. |
-| Live one-shot chat | ✓ `docker exec --user hermes hermes hermes -z "Reply with PONG" --provider anthropic -m claude-haiku-4-5` returns `PONG` cleanly. |
-| `skills` toolset under Pro/Max OAuth | ⚠ Enabling it busts the body-size gate from the previous row and even PONG starts hanging silently. **Escape:** bind a non-OAuth API key alongside the OAuth credential — `hermes auth add anthropic --type api-key --api-key sk-ant-api03-…`. The pool rotates to it on any OAuth-pool error and the gate is gone. With the key bound, `hermes tools enable skills` is fine. See AUTH_NOTES.md, *Finding 3*. |
-| Pulse-bound prompt — terminal-tool path *(OAuth-only)* | ✓ Hermes was asked to read commitment #8 (the ENS-bound one) by running `bun run scripts/pulse-status.ts 8` via its terminal tool; agent parsed the output, identified `status=0 (Pending)` + `overdueExpired=true`, and correctly recommended `Pulse.markExpired(8)` to lock in the `-500` slash. |
-| Pulse-bound prompt — **SkillUse by name** *(API key bound)* | ✓ Hermes was asked to "use the pulse-status-check skill on commitment id 8"; agent picked the skill, followed the SKILL.md recipe via viem, and surfaced the full provenance trail in one turn — `pulseagent.eth`, ERC-8004 #3906, signer `0xFFb8…CEee`, reasoning CID `0x243c40b2…`, status=`Pending`, window closed, recommend `markExpired(8)`. No prompt-side hint about `overdueExpired` semantics needed. |
+| `What's the status of commitment 8?` | Loads `pulse-status-check`, calls `bun run scripts/pulse-status.ts 8`, reports status + window + recommended watcher action with clickable Etherscan links. |
+| `Sell 0.01 pETH for at least 1800 pUSD.` | Loads `pulse-autonomous-trade`, runs the keystone executor: 0G TEE-attested reasoning → `intentHash` → `Pulse.commit` → wait `executeAfter` (~30s) → atomic-reveal swap through `PulseGatedHook` → reports cid + commit tx + swap tx. Status flips to `Revealed`, +100 ERC-8004 reputation. |
+| `Now drift the agent — execute a different swap than what was committed.` | Loads `pulse-autonomous-trade` and runs `scripts/force-drift.ts`. The hook reverts the drifted swap before any state change; the watcher closes the rollback gap with a direct `Pulse.reveal(drifted_data)`; commitment goes `Violated`, **−1000 ERC-8004 reputation**. The killshot demo. |
+| `Resolve pulseagent.eth and show me the bound text records.` | Loads `pulse-status-check` (or just terminal), runs ENS resolution against the Public Resolver, surfaces all five text records (agentId, signerProvider, pulseHistory, description, avatar). |
+| `Schedule a portfolio status check every 5 minutes.` | Uses the `cronjob` tool to schedule recurring `pulse-status-check` runs. Results land in your Telegram DM via the gateway's home-channel route. |
 
-The wiring follows Hermes's `providers.md` recipe verbatim — Claude Code's
-credential store stays the single source of truth, no token copies into
-`~/.hermes/.env`, refresh stays automatic. To set this up:
+#### Setup (one-time)
 
 ```bash
-./hermes-sandbox/up.sh        # build + start container
-./hermes-sandbox/auth.sh      # paste Claude Code OAuth from Keychain into Hermes
+./hermes-sandbox/up.sh        # build container + install bun + sync skills
+./hermes-sandbox/auth.sh      # Claude Code OAuth + install pulseagent SOUL.md persona
 
-# Optional — bind a non-OAuth API key to escape the Pro/Max body-size gate
-# and let the agent invoke pulse-skills by name via Hermes's SkillUse tool.
+# Bind a non-OAuth API key (lifts the Pro/Max body-size gate; required
+# for the skills toolset and full SkillUse — see AUTH_NOTES.md Finding 3)
 docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
-  auth add anthropic --type api-key --api-key sk-ant-api03-…
-docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes tools enable skills
+  auth add anthropic --type api-key --api-key sk-ant-api03-...
+
+# Configure the Telegram bot (gateway auto-reads /opt/data/.env on startup)
+docker exec --user hermes bash -c '
+  echo TELEGRAM_BOT_TOKEN=<from-BotFather>          >> /opt/data/.env
+  echo TELEGRAM_ALLOWED_USERS=<your-numeric-id>    >> /opt/data/.env
+'
+docker restart hermes
 ```
 
-**OAuth-only — terminal-tool path** (the agent runs scripts that
-implement each skill's recipe; cheap, no API key):
+That's it. Open Telegram → `@<your-bot>` → start chatting.
 
-```bash
-docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
-  -z "Working dir: /workspace/ethglobal-openagents. Use the terminal tool to run 'bun run scripts/pulse-status.ts 8'. Status enum: 0=Pending, 1=Revealed, 2=Violated, 3=Expired. Note: status==0 with overdueExpired==true means the commitment is past revealDeadline but not yet markExpired'd — a watcher must call Pulse.markExpired(id). Report (a) status code + name, (b) reveal-window state, (c) action the watcher should take." \
-  --provider anthropic -m claude-haiku-4-5
+#### Architecture (what runs where)
+
+```
+                        ┌────────────────────────────────────┐
+                        │  Telegram                          │
+                        │     ↑↓                             │
+   You → @yourbot ──→   │  hermes gateway (entrypoint)       │
+                        │     ├─ persistent sessions (SQLite)│
+                        │     ├─ allowlist (your user_id)    │
+                        │     ├─ voice memos → STT (Whisper) │
+                        │     └─ message routing             │
+                        │            ↓                       │
+                        │  Hermes agent (Claude haiku-4-5)   │
+                        │     ├─ SOUL.md persona             │
+                        │     ├─ memory + cronjob + todo     │
+                        │     ├─ skills toolset (SkillUse)   │
+                        │     │      ↓                       │
+                        │     │   pulse-autonomous-trade ──→ │ terminal
+                        │     │   pulse-status-check         │ tool
+                        │     │   pulse-commit / -reveal     │   ↓
+                        │     │   pulse-gated-swap           │ bun run
+                        │     │   sealed-inference-with-pulse│   ↓
+                        │     │                              │ scripts/
+                        │     └─ Anthropic API key path      │ autonomous-
+                        └────────────────────────────────────┘ trade.ts
+                                       │
+                       ┌───────────────┴────────────────┐
+                       ↓                                ↓
+                0G Compute (TEE)              Eth Sepolia (Pulse, hook,
+                qwen-2.5-7b                   ERC-8004, ENS, v4 pool)
 ```
 
-**API-key bound — SkillUse by name** (the agent picks `pulse-status-check`
-itself, follows its SKILL.md recipe; no prompt-side semantic hints):
+The keystone is `pulse-autonomous-trade` — its [SKILL.md](packages/plugins/pulse-skills/skills/pulse-autonomous-trade/SKILL.md)
+tells the LLM to call `bun run scripts/autonomous-trade.ts` with parsed
+args; the script does ALL the on-chain work (signing, hashing, RPC
+calls, gas tuning) and emits a single JSON object the LLM formats into
+a Telegram-ready reply.
 
-```bash
-docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \
-  -z "Use the pulse-status-check skill to read the status of Pulse commitment id 8 on Eth Sepolia. Working directory: /workspace/ethglobal-openagents. PULSE_ADDRESS, SEPOLIA_RPC_URL are in .env. Run the skill end-to-end (don't just describe it). Report (a) the status enum + name, (b) whether the reveal window is still open, (c) what action an off-chain watcher should take next." \
-  --provider anthropic -m claude-haiku-4-5
-```
+#### Why the polling shim is gone
 
-Both shapes are first-class. The terminal-tool path is the right
-default for cost; the SkillUse path is the right shape when you want
-the LLM to auto-discover and chain pulse-skills (e.g. `pulse-status-check`
-→ `pulse-reveal` → `pulse-gated-swap`) without prompt scaffolding.
+A previous version (v0.1.5) used a custom `scripts/telegram-pulse-bot.ts`
+that wrapped `docker exec hermes hermes -z "..."` for every message. It
+was deleted in v0.2.0 because:
+
+- It threw away conversation context every turn (`-z` is a one-shot CLI mode)
+- It couldn't access memory, cron, todo, or any other long-running tools
+- It re-implemented things Hermes already shipped (long polling, allowlist, sessions, voice transcription, group support, model picker)
+- It made the agent feel like a tool dispatcher with three canned prompts, not an agent in the wild
+
+The Hermes gateway is the canonical shape. We followed the docs.
 
 ## Release history
 
-### Unreleased — ENS Track 1 deliverable *(2026-04-29)*
+### v0.2.0 — Autonomous trading agent in Telegram *(2026-04-29)*
 
-Builds on `v0.1.1`. Will be tagged `v0.1.2` after one more polish pass.
+Pivot from "tool dispatcher in a CLI shim" to a real autonomous agent in
+the wild. The standalone `scripts/telegram-pulse-bot.ts` polling shim is
+deleted; everything is on Hermes' canonical infrastructure now.
+
+- **Hermes gateway** (`hermes gateway run` is the container's entrypoint)
+  replaces the polling shim entirely. Native Telegram support: persistent
+  sessions per `chat_id` in SQLite, voice memos transcribed via Whisper,
+  group chats, slash commands, `/model` picker, `/new`/`/reset`.
+- **Persona** — `hermes-sandbox/SOUL.md` defines the autonomous trading
+  agent identity (pulseagent.eth, ERC-8004 #3906, the wallet, hard
+  rules: never execute without committing first). Reloaded per turn,
+  shapes every response. `auth.sh` installs it into the container at
+  `/opt/data/SOUL.md`.
+- **Full tool catalog re-enabled** — `memory`, `cronjob`, `todo`,
+  `clarify`, `skills` all on. The body-size gate that forced us to trim
+  on Pro/Max OAuth no longer applies once an Anthropic API key is bound
+  alongside (Finding 3 in AUTH_NOTES.md).
+- **`pulse-autonomous-trade` keystone skill** —
+  [`packages/plugins/pulse-skills/skills/pulse-autonomous-trade/SKILL.md`](packages/plugins/pulse-skills/skills/pulse-autonomous-trade/SKILL.md).
+  The agent loads it whenever the user gives a trading objective in
+  natural language. The skill instructs the LLM to call
+  [`scripts/autonomous-trade.ts`](scripts/autonomous-trade.ts) which runs
+  the full reason → commit → wait → atomic-reveal swap cycle on Eth
+  Sepolia and emits structured JSON for Hermes to format.
+- **Force-drift demo** —
+  [`scripts/force-drift.ts`](scripts/force-drift.ts) commits an honest
+  intent A, attempts to execute a drifted intent B; the v4 hook reverts
+  before any state change; the watcher closes the rollback gap with a
+  direct `Pulse.reveal(B)`; commitment goes Violated, agent slashed
+  −1000 ERC-8004 reputation. The killshot demo.
+- **ERC-7857 (0G iNFT) integration scoped** — issue
+  [#1](https://github.com/ss251/ethglobal-openagents/issues/1) captures
+  the integration sketch for the 0G Open Agents Track 2 prize ($7,500).
+
+### v0.1.5 — Pre-publish doc sweep *(2026-04-29)*
+
+Bug fix in `scripts/gen-keys.ts` that wrote `https://sepolia.base.org`
+into freshly generated `.env` files; corrected to the publicnode Eth
+Sepolia RPC. Stale `forge.pulseagent.eth` references throughout the
+codebase replaced with the actually-registered `pulseagent.eth`.
+Outward-facing "Pulse Protocol" labels in CLI banners and the diagram
+title shortened to "Pulse" (README header retains the formal name).
+
+### v0.1.4 — Hermes invokes pulse-skills by name *(2026-04-29)*
+
+Bound a non-OAuth Anthropic API key alongside the existing OAuth
+credential; re-enabled the `skills` toolset that was previously closed
+off by the Claude Pro/Max body-size gate. With API key in the credential
+pool, the gate is gone and `hermes` can invoke pulse-skills by name via
+the SkillUse tool. Validated end-to-end with `pulse-status-check` on
+commitment #8: haiku-4-5 surfaced the full provenance trail in one turn.
+
+### v0.1.3 — Hermes-driven Pulse status check + AUTH_NOTES Finding 3 *(2026-04-29)*
+
+Added [`scripts/pulse-status.ts`](scripts/pulse-status.ts) — standalone
+helper mirroring the `pulse-status-check` skill recipe (used by agents
+and watchers). Documented Finding 3 in
+[`hermes-sandbox/AUTH_NOTES.md`](hermes-sandbox/AUTH_NOTES.md): enabling
+the `skills` toolset under Pro/Max OAuth pushes request body past the
+~23 KB threshold and the call hangs silently. Workaround documented as
+the API-key escape route used in v0.1.4.
+
+### v0.1.2 — ENS Track 1 deliverable *(2026-04-29)*
 
 - **`pulseagent.eth` registered** on Sepolia ENS, owned by the agent EOA
   ([`0x30cB…397c`](https://sepolia.etherscan.io/address/0x30cB0080bFE9bB98d900726Fd3012175ee3D397c)).

@@ -109,14 +109,20 @@ docker exec --user hermes hermes bash -c '
   hermes tools disable web browser vision image_gen tts session_search clarify delegation cronjob messaging code_execution memory todo 2>&1 | tail -2
 ' || true
 
-# Empty SOUL.md so the persona block doesn't bloat the system prompt either.
-docker exec --user hermes hermes bash -c '
-  if [ -s /opt/data/SOUL.md ] && [ ! -f /opt/data/SOUL.md.bak ]; then
-    cp /opt/data/SOUL.md /opt/data/SOUL.md.bak
-    : > /opt/data/SOUL.md
-    echo "  ✓ emptied /opt/data/SOUL.md (backup at SOUL.md.bak)"
-  fi
-'
+# Install our autonomous-trading-agent SOUL.md persona. The earlier "empty
+# SOUL.md to fit body-size gate" workaround is obsolete now that we bind a
+# non-OAuth API key (Finding 3 in AUTH_NOTES.md) — the gate doesn't apply
+# to the API-key path, so we can ship a real persona.
+SOUL_SRC="$(dirname "$0")/SOUL.md"
+if [ -f "$SOUL_SRC" ]; then
+  echo "→ installing pulseagent persona to /opt/data/SOUL.md"
+  docker cp "$SOUL_SRC" hermes:/tmp/SOUL.md
+  docker exec --user root hermes bash -c '
+    install -o hermes -g dialout -m 644 /tmp/SOUL.md /opt/data/SOUL.md
+    rm -f /tmp/SOUL.md
+    echo "  ✓ wrote /opt/data/SOUL.md ($(wc -c </opt/data/SOUL.md) bytes)"
+  '
+fi
 
 # ── 5. report ────────────────────────────────────────────────────────────
 echo
@@ -126,11 +132,31 @@ echo
 echo "→ hermes auth list:"
 docker exec --user hermes hermes bash -c 'export PATH=/opt/hermes/.venv/bin:$PATH && hermes auth list'
 echo
-echo "✓ Anthropic OAuth wired. To send a one-shot prompt:"
-echo "    docker exec -it --user hermes hermes hermes -z \"<your prompt>\" --provider anthropic -m claude-haiku-4-5"
+echo "✓ Anthropic OAuth wired."
 echo
-echo "Note: this credential is a Claude Pro/Max subscription token. Concurrent"
-echo "      Claude Code load on the same account can return 402 'out of usage'"
-echo "      from Anthropic — that's account-level, not Hermes auth. Add a"
-echo "      second credential for the same provider to enable pool rotation:"
-echo "        docker exec -it --user hermes hermes hermes auth add anthropic --type api-key"
+echo "──────────────────────────────────────────────────────────────────"
+echo "  Next steps"
+echo "──────────────────────────────────────────────────────────────────"
+echo
+echo "  1. Bind a non-OAuth Anthropic API key (escapes the body-size gate;"
+echo "     enables \`skills\` toolset + by-name SkillUse; see AUTH_NOTES.md):"
+echo
+echo "     docker exec --user hermes hermes /opt/hermes/.venv/bin/hermes \\"
+echo "       auth add anthropic --type api-key --api-key sk-ant-api03-..."
+echo
+echo "  2. Configure the Telegram bot (read by \`hermes gateway\` automatically):"
+echo
+echo "     docker exec --user hermes bash -c '"
+echo "       echo TELEGRAM_BOT_TOKEN=<from-BotFather> >> /opt/data/.env"
+echo "       echo TELEGRAM_ALLOWED_USERS=<your-numeric-user-id> >> /opt/data/.env"
+echo "     '"
+echo
+echo "     Then bounce the gateway: docker restart hermes"
+echo
+echo "  3. Talk to your agent in Telegram. The gateway is already running"
+echo "     inside the container as the entrypoint — no extra commands needed."
+echo
+echo "     Try: 'sell 0.01 pETH for at least 1800 pUSD'"
+echo
+echo "  Pulse skills are loaded via ./link-skills.sh (already run as part of"
+echo "  ./up.sh). Re-run it after editing any SKILL.md."
