@@ -101,33 +101,40 @@ async function inspectCommitment(id: bigint) {
 async function scanRecent(fromBlock: bigint | null, lastN: number) {
     const latest = await publicClient.getBlockNumber();
     const start = fromBlock ?? latest - BigInt(lastN);
-    step(`scanning blocks ${start} → ${latest}  (target=${agent.address})`);
+    step(`scanning blocks ${start} → ${latest}  (target=${agent.address})  (parallel)`);
 
-    const rows: Array<{
-        block: string;
-        tx: Hex;
-        to: string;
-        fn: string;
-        status: "success" | "reverted";
-        gas: string;
-    }> = [];
+    // Fetch every block in the range concurrently. Sepolia public RPCs cap at
+    // ~25 req/s; 100-block fan-out is well within the budget and turns 25s of
+    // sequential work into ~1.5s.
+    const blockNumbers: bigint[] = [];
+    for (let bn = latest; bn >= start; bn--) blockNumbers.push(bn);
+    const blocks = await Promise.all(
+        blockNumbers.map(bn => publicClient.getBlock({blockNumber: bn, includeTransactions: true}))
+    );
 
-    for (let bn = latest; bn >= start; bn--) {
-        const block = await publicClient.getBlock({blockNumber: bn, includeTransactions: true});
+    // Collect agent-originated txs across all blocks.
+    const candidates: Array<{block: bigint; tx: Hex; to: Address | null; input: Hex}> = [];
+    for (const block of blocks) {
         for (const tx of block.transactions) {
             if (typeof tx === "string") continue;
             if (tx.from?.toLowerCase() !== agent.address.toLowerCase()) continue;
-            const receipt = await publicClient.getTransactionReceipt({hash: tx.hash});
-            rows.push({
-                block: bn.toString(),
-                tx: tx.hash,
-                to: labelTo(tx.to),
-                fn: decodeFnName(tx.input as Hex),
-                status: receipt.status,
-                gas: receipt.gasUsed.toString()
-            });
+            candidates.push({block: block.number!, tx: tx.hash, to: tx.to ?? null, input: tx.input as Hex});
         }
     }
+
+    // Receipts fan out concurrently too.
+    const receipts = await Promise.all(
+        candidates.map(c => publicClient.getTransactionReceipt({hash: c.tx}))
+    );
+
+    const rows = candidates.map((c, i) => ({
+        block: c.block.toString(),
+        tx: c.tx,
+        to: labelTo(c.to),
+        fn: decodeFnName(c.input),
+        status: receipts[i]!.status,
+        gas: receipts[i]!.gasUsed.toString()
+    }));
 
     return {
         scenario: "pulse-introspect",
