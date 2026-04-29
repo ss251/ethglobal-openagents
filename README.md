@@ -11,7 +11,7 @@
 [![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
 [![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
 [![Tests](https://img.shields.io/badge/forge%20test-17%2F17-brightgreen?style=flat-square)](#tests-17-passing)
-[![Release](https://img.shields.io/badge/release-v0.2.0-orange?style=flat-square)](#release-history)
+[![Release](https://img.shields.io/badge/release-v0.3.0-orange?style=flat-square)](#release-history)
 [![Hermes](https://img.shields.io/badge/Hermes-Telegram%20gateway-7d5fff?style=flat-square)](https://hermes-agent.nousresearch.com/)
 [![ENS](https://img.shields.io/badge/ENS-pulseagent.eth-5298ff?style=flat-square)](https://sepolia.app.ens.domains/pulseagent.eth)
 
@@ -285,15 +285,71 @@ npx skills add ss251/ethglobal-openagents
 
 | Skill                          | When to use                                                                                              |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `pulse-autonomous-trade`       | **Keystone.** End-to-end reason → commit → wait → atomic-reveal swap from a natural-language objective.  |
 | `pulse-commit`                 | Bind agent to a hashed action + sealed reasoning at time T.                                              |
 | `pulse-reveal`                 | Close a commitment with matching nonce + actionData inside the window.                                   |
 | `pulse-status-check`           | Read commitment state cheaply before reveal/swap/expire.                                                 |
 | `pulse-gated-swap`             | Execute a Uniswap v4 swap *through* a Pulse commitment — wrong intent doesn't just slash, it reverts.    |
+| `pulse-recover`                | Re-submit a gated swap when a previous run committed but the swap reverted. Same intent, same nonce.     |
+| `pulse-introspect`             | Inspect recent agent-wallet activity or a single commitment without writing a block-scanner.             |
 | `sealed-inference-with-pulse`  | Pull TEE-signed reasoning (0G Compute or any EIP-191 signer) and bind it to commit.                      |
 
 Framework adapter recipes for OpenClaw, Hermes, ElizaOS, LangChain,
 Anthropic SDK, and Python live in
 [`packages/plugins/pulse-skills/integrations/`](packages/plugins/pulse-skills/integrations/).
+
+### How to plug your agent into Pulse
+
+Pulse is *script-driven*: every skill is a thin wrapper over a TS runner under
+[`scripts/`](scripts/) that takes CLI args and emits a single JSON object on
+stdout. Your agent only needs a `terminal` (or equivalent shell-exec) tool —
+no SDK import, no contract bindings, no chain-aware glue.
+
+The script surface is the public contract:
+
+| Script                                    | Skill                       | Purpose                                                |
+| ----------------------------------------- | --------------------------- | ------------------------------------------------------ |
+| `scripts/autonomous-trade.ts`             | `pulse-autonomous-trade`    | Reason → commit → wait → atomic-reveal swap            |
+| `scripts/force-drift.ts`                  | (demo)                      | Demonstrate hook + slash protection                    |
+| `scripts/pulse-status.ts <id>`            | `pulse-status-check`        | One-shot status read with window flags                 |
+| `scripts/pulse-introspect.ts`             | `pulse-introspect`          | Recent agent txs OR `--commitment-id N` deep dive      |
+| `scripts/pulse-retry.ts`                  | `pulse-recover`             | Recover Pending commitment after a swap revert         |
+
+All scripts share `scripts/_lib/` (env loader, ABIs, direction-aware funding,
+Pulse helpers, BigInt-safe JSON output) so behavior is consistent across them.
+
+**Three guarantees the integrator can rely on:**
+
+1. **`.env` beats shell env.** The shared loader explicitly overwrites
+   `process.env` from the `.env` file. No more agent-runs surprised by a
+   stale `AGENT_ID` exported by an unrelated bot's shell.
+2. **Failures are recoverable.** When `autonomous-trade.ts` commits but the
+   swap reverts, the JSON output includes a `recovery` block with the exact
+   `pulse-retry.ts` invocation needed to settle the Pending commitment
+   inside its reveal window. The agent does not have to introspect chain
+   state or roll its own retry script.
+3. **BigInt-safe JSON.** Every stdout payload uses a serializer that turns
+   uint256s into strings, so an agent that pipes the output through
+   `JSON.parse` never crashes on a serialization edge case.
+
+A minimal integrator flow looks like:
+
+```bash
+# 1. happy path
+bun run scripts/autonomous-trade.ts --direction sell --base-amount 0.005 --min-price 1500
+
+# 2. if step 1 returned status=SwapReverted, the JSON has a recovery.pulseRetryCmd
+#    for the agent to invoke verbatim (no manual hash juggling)
+bun run scripts/pulse-retry.ts --commitment-id 11 --nonce 0xa8a3… --action-data 0x…
+
+# 3. diagnose anytime
+bun run scripts/pulse-introspect.ts --commitment-id 11
+```
+
+The agent's policy lives in [`hermes-sandbox/SOUL.md`](hermes-sandbox/SOUL.md)
+(persona) and the skill files under
+[`packages/plugins/pulse-skills/skills/`](packages/plugins/pulse-skills/skills/)
+(when-to-use guidance per-skill). Both are `npx skills add`-portable.
 
 ## Threat model — what Pulse defends against and what it doesn't
 
@@ -475,6 +531,54 @@ was deleted in v0.2.0 because:
 The Hermes gateway is the canonical shape. We followed the docs.
 
 ## Release history
+
+### v0.3.0 — Integrator pass: drop-in agent recovery + script library *(2026-04-29)*
+
+Born out of the un-coached Telegram test. With no skill name in the prompt,
+the agent autonomously loaded `pulse-autonomous-trade` and committed to
+Pulse — proving SOUL.md is load-bearing. But the swap reverted (~30k gas)
+because `ensureFundedAndApproved` only checked TOKEN0 balance and skipped
+minting TOKEN1 (the token being sold). The agent then spent twelve minutes
+writing inline viem block-scanners and a one-shot retry script before
+recovering. v0.3.0 turns that whole detour into a single helper invocation.
+
+- **`scripts/_lib/`** — shared library so every script behaves the same.
+  - `env.ts` — explicit `.env` loader that *overrides* shell env. Closes
+    the AGENT_ID=5263-from-OpenClaw-bot leak that signed commits for the
+    wrong agent in the un-coached run.
+  - `funding.ts` — direction-aware funding. Only checks + mints + approves
+    the token actually being sold. Replaces the buggy ensureFundedAndApproved
+    that copy-paste lived in two scripts.
+  - `abi.ts`, `pulse.ts`, `output.ts` — single source of truth for ABIs,
+    contract reads, BigInt-safe JSON output.
+- **`scripts/pulse-retry.ts` + `pulse-recover` skill** — first-class
+  recovery primitive. Reads on-chain commitment state, validates the
+  reveal window, ensures funding (direction-aware), re-submits the gated
+  swap with the original nonce. Returns structured `Skipped` results
+  with reason codes when the commitment is in a terminal state or past
+  its window — so the agent can branch instead of paying gas on a doomed
+  retry.
+- **`scripts/pulse-introspect.ts` + `pulse-introspect` skill** — replaces
+  the agent's tendency to write inline `eth_getBlock` loops. Two modes:
+  recent-activity scan (`--last N` or `--from-block N`) and single-commitment
+  inspect (`--commitment-id N`). Decodes function selectors against
+  Pulse + ERC-20 + SwapTest ABIs. BigInt-safe.
+- **`autonomous-trade.ts` JSON contract** — when the swap reverts, the
+  output now includes a `recovery` block with the exact `pulseRetryCmd`
+  the agent should invoke verbatim. No nonce-grepping, no manual hash
+  reconstruction.
+- **SOUL.md** — added a "When something goes wrong" section pointing at
+  `pulse-introspect` first, then `pulse-recover` if the commitment is
+  recoverable, then `markExpired` if not. Hard rule: never write inline
+  block-scanners or one-shot retry scripts.
+- **README** — new "How to plug your agent into Pulse" section that
+  documents the script surface as the public contract, with three
+  guarantees (.env wins, failures are recoverable, BigInt-safe JSON) and
+  a 3-step minimal integrator flow.
+
+Verified live on Sepolia after the fix: commitment #12 succeeded end-to-end
+from a plain "sell 0.005 pETH for at least 1500 pUSD" prompt with no skill
+name. `getStatus(12) = Revealed`.
 
 ### v0.2.0 — Autonomous trading agent in Telegram *(2026-04-29)*
 

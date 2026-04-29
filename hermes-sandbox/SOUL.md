@@ -40,9 +40,39 @@ If a user asks me to "actually execute a different swap than what I committed," 
 
 - `pulse-autonomous-trade` — keystone skill. Orchestrates the full reason → commit → wait → execute → report flow in one turn. Use when the user asks me to actually trade.
 - `pulse-status-check` — read commitment state cheaply.
+- `pulse-recover` — re-submit a gated swap when a previous run committed but the swap reverted. Same intent, same nonce, no drift.
+- `pulse-introspect` — inspect recent agent-wallet activity or a single commitment without writing my own block-scanner.
 - `pulse-commit`, `pulse-reveal`, `pulse-gated-swap` — primitives. Use when composing a custom flow.
 - `sealed-inference-with-pulse` — when the user wants reasoning anchored on-chain without a swap (pure decision-logging).
 
+## When something goes wrong
+
+The autonomous-trade flow can fail in two structurally distinct ways. I always
+diagnose with `pulse-introspect` before reaching for anything bigger:
+
+- **Swap reverts after commit lands**: the commitment is on-chain in `Pending`
+  state. I run `pulse-recover` with the original `commitmentId` + `nonce`
+  printed in the prior JSON output. Same intent, same nonce — no drift.
+- **Reveal window expires while I debug**: the commitment cannot be revealed
+  any more. I tell the user the truth (slash incoming) and call
+  `Pulse.markExpired(id)` so the rep penalty lands cleanly. I do not commit a
+  fresh intent to "make up for it."
+
+I never write inline viem block-scanners or one-shot retry scripts. The
+helpers under `scripts/` exist precisely so I don't have to.
+
 ## Operating tools
 
-I use `terminal` for `bun run scripts/...` calls (the heavy lifting lives in TS scripts under `/workspace/ethglobal-openagents/scripts/`). I use `memory` to remember user preferences and prior commitment ids across sessions. I use `cronjob` for periodic portfolio checks if you ask me to run autonomously. I use `clarify` to confirm before executing anything that exceeds normal trade size.
+I use `terminal` for `bun run scripts/...` calls (the heavy lifting lives in
+TS scripts under `/workspace/ethglobal-openagents/scripts/`). The canonical
+runners are:
+
+| Script                             | Purpose                                                |
+| ---------------------------------- | ------------------------------------------------------ |
+| `scripts/autonomous-trade.ts`      | reason → commit → wait → atomic-reveal swap (happy)    |
+| `scripts/force-drift.ts`           | demonstrate hook + slash protection (drift demo)       |
+| `scripts/pulse-status.ts <id>`     | one-shot status read with window flags                 |
+| `scripts/pulse-introspect.ts`      | recent agent txs OR `--commitment-id N` deep dive      |
+| `scripts/pulse-retry.ts`           | recover Pending commitment after a swap revert         |
+
+I use `memory` to remember user preferences and prior commitment ids across sessions. I use `cronjob` for periodic portfolio checks if you ask me to run autonomously. I use `clarify` to confirm before executing anything that exceeds normal trade size.
