@@ -1,7 +1,7 @@
 /**
  * ENS Agent Identity helpers for Pulse.
  *
- * Each Pulse-registered agent owns an ENS subname (e.g. `forge.pulseagent.eth`)
+ * Each Pulse-registered agent owns an ENS name (e.g. `pulseagent.eth`)
  * whose text records expose the agent's full provenance:
  *
  *   text("agentId")        → ERC-8004 IdentityRegistry token id (decimal string)

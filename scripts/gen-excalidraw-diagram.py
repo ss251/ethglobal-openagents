@@ -271,7 +271,7 @@ def add_box(col_xs, col_idx, y, h, label, *, logo=None, color, bg, title_size=14
 
 
 # Title
-elements.append(text(60, 24, "Pulse Protocol — End-to-End",
+elements.append(text(60, 24, "Pulse — End-to-End",
                      size=34, color="#0b7285", align="left", w=950))
 elements.append(text(60, 70,
                      "Sealed agent commitments  ·  ERC-8004 reputation  ·  Uniswap v4 hook gating",

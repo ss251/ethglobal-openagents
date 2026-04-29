@@ -2,7 +2,7 @@
  * Reference scenario: a Pulse-bound autonomous swap.
  *
  * The agent:
- *  1. Resolves its own identity via ENS (forge.pulseagent.eth or similar)
+ *  1. Resolves its own identity via ENS (e.g. pulseagent.eth)
  *  2. Calls 0G Compute for sealed-inference reasoning about the swap
  *  3. Quotes the swap via the Uniswap Trading API
  *  4. Computes the canonical intent hash from the V4-encoded (PoolKey, SwapParams)

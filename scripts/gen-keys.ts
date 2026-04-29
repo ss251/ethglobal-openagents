@@ -92,7 +92,7 @@ DEMO_TEE_SIGNER_KEY=${keys[3].privateKey}
 # Address: ${keys[3].address}
 
 # ── RPC + chain ───────────────────────────────────────────────────────────
-SEPOLIA_RPC_URL=https://sepolia.base.org
+SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 
 # ── Canonical ERC-8004 (do not redeploy) ──────────────────────────────────
 IDENTITY_REGISTRY=0x8004A818BFB912233c491871b3d84c89A494BD9e
@@ -150,10 +150,10 @@ console.log("     The first 4 accounts MetaMask shows are the ones above.");
 console.log();
 console.log("  2. Add Eth Sepolia network in MetaMask:");
 console.log("     Network: Eth Sepolia");
-console.log("     RPC:     https://sepolia.base.org");
-console.log("     Chain:   84532");
+console.log("     RPC:     https://ethereum-sepolia-rpc.publicnode.com");
+console.log("     Chain:   11155111");
 console.log("     Symbol:  ETH");
-console.log("     Explorer: https://sepolia.basescan.org");
+console.log("     Explorer: https://sepolia.etherscan.io");
 console.log();
 console.log("  3. Fund accounts 0, 1, 2 from a Eth Sepolia faucet:");
 console.log("     https://portal.cdp.coinbase.com/products/faucet  (most reliable)");

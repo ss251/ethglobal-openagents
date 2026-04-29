@@ -14,7 +14,7 @@
 services:
   gateway:
     # Mount the repo so Hermes's container can read pulse-skills sources and
-    # run our `bun run scripts/...` commands against the live Base Sepolia
+    # run our `bun run scripts/...` commands against the live Eth Sepolia
     # contracts. Without this, the skills can find SKILL.md (via ~/.hermes/skills/)
     # but can't actually invoke the underlying scripts.
     volumes:

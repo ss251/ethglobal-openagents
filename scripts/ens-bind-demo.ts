@@ -86,7 +86,7 @@ function expectedHistoryURL(addr: Address): string {
 
 async function bindRecords() {
     console.log("══════════════════════════════════════════════════════════════════");
-    console.log(" ENS bind  ·  pulseagent.eth ↔ Pulse Protocol agent provenance");
+    console.log(" ENS bind  ·  pulseagent.eth ↔ Pulse agent provenance");
     console.log("══════════════════════════════════════════════════════════════════");
     console.log(`  ENS name:        ${ENS_NAME}`);
     console.log(`  Agent address:   ${agent.address}`);

@@ -117,7 +117,7 @@ the contract executes the resulting action exactly as written.
 Pulse extends the audit perimeter to the agent's reasoning. At decision time:
 
 1. The agent calls a TEE and receives sealed reasoning + a cryptographic signature.
-2. It commits the hash of `(action + reasoning)` onchain, identified by its ENS name (e.g. `forge.pulseagent.eth`) and ERC-8004 token id.
+2. It commits the hash of `(action + reasoning)` onchain, identified by its ENS name (e.g. `pulseagent.eth`) and ERC-8004 token id.
 3. Inside a fixed reveal window, the agent must reveal an action whose hash matches the commitment. Mismatch → automatic ERC-8004 reputation slash. No reveal → expiry slash.
 4. On Uniswap v4, `PulseGatedHook` makes wrong-intent swaps physically impossible — they revert before any state change. Off-chain, the agent's swap path goes through the Uniswap Trading API.
 
@@ -137,8 +137,8 @@ NoOp surface). Swaps must include `hookData = abi.encode(commitmentId, nonce)`;
 the hook either atomically reveals a `Pending` commitment or hash-verifies a
 `Revealed` one. Wrong intent → revert before state change.
 
-**ENS Agent Identity** — agents register ENS subnames (e.g.
-`forge.pulseagent.eth`) whose text records resolve to their ERC-8004 entry,
+**ENS Agent Identity** — agents register an ENS name (e.g.
+`pulseagent.eth`) whose text records resolve to their ERC-8004 entry,
 TEE signer, and Pulse commitment history. One human-readable handle for the
 agent's full provenance.
 
