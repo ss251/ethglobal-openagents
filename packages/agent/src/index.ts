@@ -1,6 +1,6 @@
 import {createWalletClient, http, type Address, type Hex} from "viem";
 import {privateKeyToAccount} from "viem/accounts";
-import {baseSepolia} from "viem/chains";
+import {sepolia} from "viem/chains";
 
 interface AgentConfig {
     privateKey: Hex;
@@ -12,7 +12,7 @@ interface AgentConfig {
 
 export async function bootstrap(cfg: AgentConfig) {
     const account = privateKeyToAccount(cfg.privateKey);
-    const wallet = createWalletClient({account, chain: baseSepolia, transport: http(cfg.rpcUrl)});
+    const wallet = createWalletClient({account, chain: sepolia, transport: http(cfg.rpcUrl)});
     return {wallet, cfg};
 }
 

@@ -1,5 +1,5 @@
 /**
- * Sealed-inference → Pulse commitment, end-to-end, on Base Sepolia.
+ * Sealed-inference → Pulse commitment, end-to-end, on Eth Sepolia.
  *
  * Replaces the random reasoningCID stand-in with a content hash derived from
  * an actual 0G Compute call. Anyone can later re-pull the (prompt, response)
@@ -30,11 +30,11 @@ import {
     type Hex
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
-import {baseSepolia} from "viem/chains";
+import {sepolia} from "viem/chains";
 import {randomBytes} from "node:crypto";
 
 // ─── env ──────────────────────────────────────────────────────────────────
-const RPC = process.env.BASE_SEPOLIA_RPC_URL!;
+const RPC = process.env.SEPOLIA_RPC_URL!;
 const PULSE = process.env.PULSE_ADDRESS! as Address;
 const AGENT_KEY = process.env.AGENT_PRIVATE_KEY! as Hex;
 const TEE_KEY = process.env.DEMO_TEE_SIGNER_KEY! as Hex;
@@ -53,8 +53,8 @@ const agent = privateKeyToAccount(AGENT_KEY);
 const tee = privateKeyToAccount(TEE_KEY);
 const zg = new OpenAI({apiKey: ZG_API_KEY, baseURL: ZG_BROKER_URL});
 
-const publicClient = createPublicClient({chain: baseSepolia, transport: http(RPC)});
-const walletClient = createWalletClient({account: agent, chain: baseSepolia, transport: http(RPC)});
+const publicClient = createPublicClient({chain: sepolia, transport: http(RPC)});
+const walletClient = createWalletClient({account: agent, chain: sepolia, transport: http(RPC)});
 
 const PULSE_ABI = [
     {

@@ -1,0 +1,130 @@
+{
+  "chainId": 11155111,
+  "chainName": "Ethereum Sepolia",
+  "rpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
+  "explorer": "https://sepolia.etherscan.io",
+  "deployedAt": "2026-04-29T09:30:00Z",
+  "deployer": "0x050F72f9332eb1Ef289ca497F8dA911a14066Fa1",
+  "contracts": {
+    "Pulse": {
+      "address": "0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34",
+      "explorer": "https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34",
+      "deployTx": "0x422789a5d495eb2e8bd797e40ba3bbd724ab893ac3c0117c06fb4b0e3f4177a0",
+      "constructorArgs": {
+        "identityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+        "reputationRegistry": "0x8004B663056A597Dffe9eCcC1965A193B7388713"
+      },
+      "note": "Same address as the previous Base Sepolia deployment because deployer + nonce are identical and CREATE is deterministic."
+    },
+    "PulseGatedHook": {
+      "address": "0x274b3c0f55c2db8c392418649c1eb3aad1ecc080",
+      "explorer": "https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080",
+      "constructorArgs": {
+        "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+        "pulse": "0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34"
+      },
+      "permissionFlagsDecoded": "BEFORE_SWAP_FLAG only (no NoOp surface, no beforeSwapReturnDelta)",
+      "note": "Different address from Base Sepolia hook because PoolManager is different — HookMiner found a new CREATE2 salt for the same flag pattern."
+    },
+    "MockToken0_pUSD": {
+      "address": "0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA",
+      "name": "Pulse Mock USD",
+      "symbol": "pUSD",
+      "explorer": "https://sepolia.etherscan.io/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA"
+    },
+    "MockToken1_pWETH": {
+      "address": "0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349",
+      "name": "Pulse Mock WETH",
+      "symbol": "pWETH",
+      "explorer": "https://sepolia.etherscan.io/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349"
+    },
+    "PulseGatedV4Pool": {
+      "currency0": "0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA",
+      "currency1": "0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349",
+      "fee": 3000,
+      "tickSpacing": 60,
+      "hooks": "0x274b3c0f55c2db8c392418649c1eb3aad1ecc080",
+      "initialSqrtPriceX96": "79228162514264337593543950336",
+      "initialLiquidity": "100000000000000000000",
+      "seedAmountPerSide": "1000000000000000000000000",
+      "note": "Initialized via script/Phase2.s.sol with a wide-range LP position."
+    }
+  },
+  "agent": {
+    "address": "0x30cB0080bFE9bB98d900726Fd3012175ee3D397c",
+    "agentId": 3906,
+    "registrationTx": "0x88f9d072aaf9dbd64c093d5ee41451793e5402002e589fdc1a82c499abca68dc",
+    "ensName": null,
+    "ensRegistration": "TODO — register pulseagent.eth on https://sepolia.app.ens.domains and run scripts/ens-bind-demo.ts"
+  },
+  "dependencies": {
+    "ERC8004IdentityRegistry": {
+      "address": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+      "note": "Canonical, do not redeploy. Same address as on Base Sepolia."
+    },
+    "ERC8004ReputationRegistry": {
+      "address": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+      "note": "Canonical, do not redeploy. Same address as on Base Sepolia."
+    },
+    "UniswapV4PoolManager": {
+      "address": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+      "source": "https://docs.uniswap.org/contracts/v4/deployments"
+    },
+    "UniswapV4PoolSwapTest": {
+      "address": "0x9b6b46e2c869aa39918db7f52f5557fe577b6eee"
+    },
+    "UniswapV4PoolModifyLiquidityTest": {
+      "address": "0x0c478023803a644c94c4ce1c1e7b9a087e411b0a"
+    },
+    "UniswapV4PositionManager": {
+      "address": "0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4"
+    },
+    "UniswapV4Quoter": {
+      "address": "0x61b3f2011a92d183c7dbadbda940a7555ccf9227"
+    },
+    "Permit2": {
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+    },
+    "UniversalRouter": {
+      "address": "0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b"
+    },
+    "ENSRegistry": {
+      "address": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+      "source": "https://docs.ens.domains/learn/deployments"
+    },
+    "ENSPublicResolver": {
+      "address": "0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5"
+    },
+    "ENSETHRegistrarController": {
+      "address": "0xfb3cE5D01e0f33f41DbB39035dB9745962F1f968"
+    },
+    "ENSUniversalResolver": {
+      "address": "0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe"
+    }
+  },
+  "validatedFlows": {
+    "e2e-commit-reveal": {
+      "kept": "cid=1, tx=0xd44635e0eed96920537a8c07736414a619a2261ae743d5492285544bf8c1f6c3, rep=+100",
+      "violated": "cid=2, tx=0x67cf4afe75637de5067bc6d41004eb023d49cfc954a28c3cbfeba2017dca60b9, rep=-1000",
+      "expired": "cid=3, tx=0xb6cddf536f26763d54266e7076f1b044dca89d57c088cd19a3f93b0f2946d6cc, rep=-500"
+    },
+    "exercise-gated-swap": {
+      "naked": "rejected at simulation (hook revert MalformedHookData)",
+      "bound": "cid=4, status=Revealed, tx=0x3cf3158a20bdf4a4bb4c787bf7507bf8345678f679026aa9d43d2303613562b8"
+    },
+    "violation-and-rollback-demo": {
+      "rollbackGap": "cid=5, status stayed Pending after revert",
+      "watcherRecovery": "cid=5, status=Violated after direct reveal, tx=0x7bab2377bce344e6e4fd31669d4ea7ab9040a48435b381f13e4b619041ebfec4"
+    },
+    "sealed-inference-demo": {
+      "commitmentId": 6,
+      "tx": "0x810718ce64de40cece67f7c62776753dfa10a63778e4868dd9ac48ea08a0e713",
+      "model": "qwen/qwen-2.5-7b-instruct via 0G Compute"
+    },
+    "phase8-tradingapi-demo": {
+      "commitmentId": 7,
+      "tx": "0x44af94c32fb85f928d99d31f7cc03d218ea8f4a43d7a7e84023d931688a9034f",
+      "quote": "1 WETH → 2326.43 USDC (Uniswap Trading API DUTCH_V2 on Ethereum mainnet)"
+    }
+  }
+}

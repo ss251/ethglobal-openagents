@@ -228,7 +228,7 @@ README threat-model row 11, `scripts/e2e-commit-reveal.ts`.
   Eliza, custom).
 - ✅ Composes with the canonical ERC-8004 deployment — we redeploy nothing.
 - ✅ Three load-bearing trade-offs are explicit, instrumented, and tested
-  end-to-end on Base Sepolia.
+  end-to-end on Eth Sepolia.
 
 ### Negative
 

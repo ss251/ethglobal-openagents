@@ -1,5 +1,5 @@
 /**
- * End-to-end commit-reveal driver against deployed Pulse on Base Sepolia.
+ * End-to-end commit-reveal driver against deployed Pulse on Eth Sepolia.
  *
  * Runs three flows back-to-back:
  *   1. KEPT     — commit, wait window, reveal with matching data, +100 rep
@@ -27,7 +27,7 @@ import {
     type Hex
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
-import {baseSepolia} from "viem/chains";
+import {sepolia} from "viem/chains";
 import {randomBytes} from "node:crypto";
 
 // Inline the parts of the ABI we need — avoids workspace import complexity
@@ -157,7 +157,7 @@ const REPUTATION_REGISTRY_ABI = [
 
 const STATUS_LABELS = ["Pending", "Revealed", "Violated", "Expired"] as const;
 
-const RPC = process.env.BASE_SEPOLIA_RPC_URL!;
+const RPC = process.env.SEPOLIA_RPC_URL!;
 const PULSE = process.env.PULSE_ADDRESS! as Address;
 const REPUTATION_REGISTRY = process.env.REPUTATION_REGISTRY! as Address;
 const AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY! as Hex;
@@ -167,11 +167,11 @@ const AGENT_ID = BigInt(process.env.AGENT_ID!);
 const agent = privateKeyToAccount(AGENT_PRIVATE_KEY);
 const tee = privateKeyToAccount(TEE_KEY);
 
-const publicClient = createPublicClient({chain: baseSepolia, transport: http(RPC)});
-const walletClient = createWalletClient({account: agent, chain: baseSepolia, transport: http(RPC)});
+const publicClient = createPublicClient({chain: sepolia, transport: http(RPC)});
+const walletClient = createWalletClient({account: agent, chain: sepolia, transport: http(RPC)});
 
 console.log("══════════════════════════════════════════════════════════════════");
-console.log(" Pulse e2e commit-reveal driver — Base Sepolia (chainId 84532)");
+console.log(" Pulse e2e commit-reveal driver — Eth Sepolia (chainId 84532)");
 console.log("══════════════════════════════════════════════════════════════════");
 console.log(`  Pulse:           ${PULSE}`);
 console.log(`  Agent wallet:    ${agent.address}`);

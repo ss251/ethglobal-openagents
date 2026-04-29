@@ -19,7 +19,7 @@
  * Run as a long-lived service (or a cron):
  *   bun run scripts/watch-and-slash.ts
  *
- * Required env: WATCHER_KEY, BASE_SEPOLIA_RPC_URL, PULSE_ADDRESS, HOOK_ADDRESS, POOL_MANAGER.
+ * Required env: WATCHER_KEY, SEPOLIA_RPC_URL, PULSE_ADDRESS, HOOK_ADDRESS, POOL_MANAGER.
  */
 
 import {
@@ -34,24 +34,24 @@ import {
     type Log
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
-import {baseSepolia} from "viem/chains";
+import {sepolia} from "viem/chains";
 
 import {PULSE_ABI} from "../packages/sdk/src/pulse.js";
 
-const RPC = process.env.BASE_SEPOLIA_RPC_URL!;
+const RPC = process.env.SEPOLIA_RPC_URL!;
 const WATCHER_KEY = process.env.WATCHER_KEY as `0x${string}`;
 const PULSE_ADDRESS = process.env.PULSE_ADDRESS as Address;
 const HOOK_ADDRESS = process.env.HOOK_ADDRESS as Address;
 const POOL_MANAGER = process.env.POOL_MANAGER as Address;
 
 if (!RPC || !WATCHER_KEY || !PULSE_ADDRESS || !HOOK_ADDRESS || !POOL_MANAGER) {
-    console.error("Missing env. Need BASE_SEPOLIA_RPC_URL, WATCHER_KEY, PULSE_ADDRESS, HOOK_ADDRESS, POOL_MANAGER.");
+    console.error("Missing env. Need SEPOLIA_RPC_URL, WATCHER_KEY, PULSE_ADDRESS, HOOK_ADDRESS, POOL_MANAGER.");
     process.exit(1);
 }
 
 const account = privateKeyToAccount(WATCHER_KEY);
-const publicClient = createPublicClient({chain: baseSepolia, transport: http(RPC)});
-const walletClient = createWalletClient({account, chain: baseSepolia, transport: http(RPC)});
+const publicClient = createPublicClient({chain: sepolia, transport: http(RPC)});
+const walletClient = createWalletClient({account, chain: sepolia, transport: http(RPC)});
 
 /// Pool key + swap params encoding the hook recomputes — must match the
 /// onchain encoding in PulseGatedHook._beforeSwap (abi.encode(key, params)).

@@ -10,7 +10,7 @@
  *   3. Hash the entire quote payload into reasoningCID — anyone can later
  *      re-pull (or recompute from the requestId) the canonical quote and
  *      verify it matches what the agent committed to.
- *   4. Commit on Base Sepolia via Pulse.
+ *   4. Commit on Eth Sepolia via Pulse.
  *
  * Why this is a meaningful demo: agents in production quote first, decide,
  * then execute. Pulse turns "decide" into a public, time-bounded artifact
@@ -32,12 +32,12 @@ import {
     type Hex
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
-import {baseSepolia} from "viem/chains";
+import {sepolia} from "viem/chains";
 import {randomBytes} from "node:crypto";
 
 import {quoteSwap, type QuoteResponse} from "../packages/sdk/src/trading.js";
 
-const RPC = process.env.BASE_SEPOLIA_RPC_URL!;
+const RPC = process.env.SEPOLIA_RPC_URL!;
 const PULSE = process.env.PULSE_ADDRESS! as Address;
 const AGENT_KEY = process.env.AGENT_PRIVATE_KEY! as Hex;
 const TEE_KEY = process.env.DEMO_TEE_SIGNER_KEY! as Hex;
@@ -46,8 +46,8 @@ const AGENT_ID = BigInt(process.env.AGENT_ID!);
 const agent = privateKeyToAccount(AGENT_KEY);
 const tee = privateKeyToAccount(TEE_KEY);
 
-const publicClient = createPublicClient({chain: baseSepolia, transport: http(RPC)});
-const walletClient = createWalletClient({account: agent, chain: baseSepolia, transport: http(RPC)});
+const publicClient = createPublicClient({chain: sepolia, transport: http(RPC)});
+const walletClient = createWalletClient({account: agent, chain: sepolia, transport: http(RPC)});
 
 const PULSE_ABI = [
     {
@@ -242,7 +242,7 @@ async function main() {
     console.log(`  Pulse:  ${PULSE}`);
     console.log(`  Agent:  ${agent.address} (id=${AGENT_ID})`);
     console.log(`  Quote:  Trading API (Ethereum mainnet, real liquidity)`);
-    console.log(`  Commit: Base Sepolia\n`);
+    console.log(`  Commit: Eth Sepolia\n`);
 
     const bundle = await buildCommitmentBundle();
     console.log(`\n  intentHash:    ${bundle.intentHash}`);
@@ -250,7 +250,7 @@ async function main() {
     console.log(`  nonce:         ${bundle.nonce}`);
     console.log(`  actionData:    ${bundle.actionData.slice(0, 80)}…`);
 
-    console.log("\n→ Committing on Base Sepolia…");
+    console.log("\n→ Committing on Eth Sepolia…");
     const {commitmentId, commitTx} = await commitToQuote(bundle);
     console.log(`  commit tx:     ${commitTx}`);
     console.log(`  commitmentId:  ${commitmentId}`);

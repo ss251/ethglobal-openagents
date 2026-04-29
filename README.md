@@ -6,7 +6,7 @@
 > ERC-8004 reputation, and Uniswap v4 hook gating make drift slashable
 > and (at the v4 layer) physically impossible.
 
-[![Base Sepolia](https://img.shields.io/badge/deployed-Base%20Sepolia-blue?style=flat-square)](https://sepolia.basescan.org/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34)
+[![Eth Sepolia](https://img.shields.io/badge/deployed-Eth%20Sepolia-blue?style=flat-square)](https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34)
 [![ERC-8004](https://img.shields.io/badge/ERC--8004-canonical-teal?style=flat-square)](https://github.com/erc-8004/erc-8004-contracts)
 [![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
 [![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
@@ -20,13 +20,13 @@ flowchart TD
         direction LR
         Hermes["<b>Hermes container</b><br/>Nous Research<br/>Claude Max via OAuth"]
         Skills["<b>pulse-skills bundle</b><br/>SKILL.md × 5"]
-        Agent(["<b>Agent EOA</b><br/>0x30cB…397c<br/>ERC-8004 #5263"])
+        Agent(["<b>Agent EOA</b><br/>0x30cB…397c<br/>ERC-8004 #3906"])
         ZG["<b>0G Compute</b><br/>TEE-attested qwen-2.5-7b<br/>provider 0xa48f…"]
         Trade["<b>Uniswap Trading API</b><br/>/v1/quote · DUTCH_V2"]
     end
 
-    %% ── On-chain Base Sepolia ──────────────────────────────────────────
-    subgraph BASE["⛓ Base Sepolia — chainId 84532"]
+    %% ── On-chain Eth Sepolia ──────────────────────────────────────────
+    subgraph BASE["⛓ Eth Sepolia — chainId 11155111"]
         direction LR
         subgraph ERC[" "]
             direction TB
@@ -36,8 +36,8 @@ flowchart TD
         Pulse[["<b>Pulse.sol</b><br/>0xbe1b…BF34<br/>commit · reveal · markExpired"]]
         subgraph V4["Uniswap v4 stack"]
             direction TB
-            Hook["<b>PulseGatedHook</b><br/>0x137002…8080<br/>beforeSwap — atomic reveal"]
-            PM["<b>v4 PoolManager</b><br/>0x05E73…3408"]
+            Hook["<b>PulseGatedHook</b><br/>0x274b…c080<br/>beforeSwap — atomic reveal"]
+            PM["<b>v4 PoolManager</b><br/>0xE03A1…3543"]
             Pool["<b>pUSD ↔ pWETH</b><br/>fee 0.3% · tickSpacing 60"]
         end
     end
@@ -90,9 +90,9 @@ flowchart TD
 
 > **Quick start.** `forge build && forge test` for the contracts;
 > `bun run scripts/e2e-commit-reveal.ts` for the full commit / reveal /
-> violated / expired flow on Base Sepolia. Six end-to-end scripts under
+> violated / expired flow on Eth Sepolia. Six end-to-end scripts under
 > [`scripts/`](scripts/) cover every load-bearing flow — see
-> [Live demos on Base Sepolia](#live-demos-on-base-sepolia).
+> [Live demos on Eth Sepolia](#live-demos-on-eth-sepolia).
 >
 > **Architecture rationale + threat-model trade-offs.** See
 > [`docs/adr/0001-audit-perimeter.md`](docs/adr/0001-audit-perimeter.md).
@@ -201,8 +201,8 @@ The hook makes Pulse load-bearing for swap *execution*, not just validation. A p
 - **OpenZeppelin/uniswap-hooks** — production-grade `BaseHook` for v4 hook implementations
 - **Uniswap v4-core + v4-periphery** — `IPoolManager`, `Hooks`, `IHooks`, `BeforeSwapDelta`, `HookMiner` (transitively through `OpenZeppelin/uniswap-hooks`)
 - **ERC-8004 IdentityRegistry + ReputationRegistry** — canonical deployments. Pulse does not redeploy them.
-  - Base Sepolia / Ethereum Sepolia IdentityRegistry: `0x8004A818BFB912233c491871b3d84c89A494BD9e`
-  - Base Sepolia / Ethereum Sepolia ReputationRegistry: `0x8004B663056A597Dffe9eCcC1965A193B7388713`
+  - Eth Sepolia / Ethereum Sepolia IdentityRegistry: `0x8004A818BFB912233c491871b3d84c89A494BD9e`
+  - Eth Sepolia / Ethereum Sepolia ReputationRegistry: `0x8004B663056A597Dffe9eCcC1965A193B7388713`
   - Reference implementation: [erc-8004/erc-8004-contracts](https://github.com/erc-8004/erc-8004-contracts)
 
 ## Quick start
@@ -215,7 +215,7 @@ forge test
 
 Should report **17 tests passing** (6 Pulse + 11 hook).
 
-Deploy Pulse to Base Sepolia:
+Deploy Pulse to Eth Sepolia:
 
 ```bash
 export PRIVATE_KEY=0x...
@@ -312,7 +312,7 @@ honest table:
 | `signerProvider` is an EOA pretending to be a TEE | **Honestly disclosed.** The contract checks ECDSA recovery, not attestation. README, SPEC, and demo UI all explicitly label "stand-in vs production 0G enclave-born key." | |
 | Wash-trade reputation between same-owner agents | **Inherited ERC-8004 weakness.** | |
 | Honest-on-paper, malicious-in-practice business model | **Not defended.** Pulse certifies *consistency*, not *quality of intent.* | |
-| `eth_estimateGas` underbudgets close-tx (reveal/markExpired) gas | **SDK-mitigated.** `Pulse.reveal` and `markExpired` invoke `ReputationRegistry.giveFeedback` through a `try/catch`. RPCs estimate the OOG-success branch (catch swallows the inner OOG) and quote ~225k, but the inner storage writes need ~450k. The SDK ships explicit defaults (`DEFAULT_REVEAL_GAS = 600_000`, `DEFAULT_MARK_EXPIRED_GAS = 500_000`); custom integrators must override. | Discovered during e2e on Base Sepolia. |
+| `eth_estimateGas` underbudgets close-tx (reveal/markExpired) gas | **SDK-mitigated.** `Pulse.reveal` and `markExpired` invoke `ReputationRegistry.giveFeedback` through a `try/catch`. RPCs estimate the OOG-success branch (catch swallows the inner OOG) and quote ~225k, but the inner storage writes need ~450k. The SDK ships explicit defaults (`DEFAULT_REVEAL_GAS = 600_000`, `DEFAULT_MARK_EXPIRED_GAS = 500_000`); custom integrators must override. | Discovered during e2e on Eth Sepolia. |
 
 The `watch-and-slash.ts` watcher is the single most important post-deployment
 operational addition — it closes the atomic-reveal rollback gap without
@@ -320,14 +320,14 @@ contract changes.
 
 ## Status
 
-### Deployed on Base Sepolia (chainId 84532)
+### Deployed on Eth Sepolia (chainId 11155111)
 
 | Contract | Address | Explorer |
 | --- | --- | --- |
-| **Pulse** | `0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34` | [Basescan](https://sepolia.basescan.org/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34) |
-| **PulseGatedHook** | `0x137002596a3a818B36d82490cF79B35c376e8080` | [Basescan](https://sepolia.basescan.org/address/0x137002596a3a818B36d82490cF79B35c376e8080) |
-| **Pulse Mock USD (`pUSD`)** | `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA` | [Basescan](https://sepolia.basescan.org/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA) |
-| **Pulse Mock WETH (`pWETH`)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Basescan](https://sepolia.basescan.org/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
+| **Pulse** | `0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34` | [Basescan](https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34) |
+| **PulseGatedHook** | `0x274b3c0f55c2db8c392418649c1eb3aad1ecc080` | [Basescan](https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080) |
+| **Pulse Mock USD (`pUSD`)** | `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA` | [Basescan](https://sepolia.etherscan.io/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA) |
+| **Pulse Mock WETH (`pWETH`)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Basescan](https://sepolia.etherscan.io/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
 
 Pool: `pUSD ↔ pWETH`, fee `0.3%`, tickSpacing 60, initialized at 1:1 with a
 wide-range LP position via `script/Phase2.s.sol`.
@@ -338,13 +338,13 @@ no `beforeSwapReturnDelta`). Mined via CREATE2 salt 57991.
 Wires into:
 - ERC-8004 IdentityRegistry `0x8004A818BFB912233c491871b3d84c89A494BD9e`
 - ERC-8004 ReputationRegistry `0x8004B663056A597Dffe9eCcC1965A193B7388713`
-- Uniswap v4 PoolManager `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408`
+- Uniswap v4 PoolManager `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`
 - 0G Compute provider `0xa48f01287233509FD694a22Bf840225062E67836` (qwen-2.5-7b-instruct, TEE-attested proxy)
 
 Full deployment record (constructor args, gas, dependencies) at
-[`deployments/base-sepolia.json`](deployments/base-sepolia.json).
+[`deployments/sepolia.json`](deployments/sepolia.json).
 
-### Live demos on Base Sepolia
+### Live demos on Eth Sepolia
 
 Six end-to-end scripts exercise the deployed contracts; each prints tx
 hashes you can open in Basescan.
@@ -355,7 +355,7 @@ hashes you can open in Basescan.
 | `bun run scripts/exercise-gated-swap.ts` | The `PulseGatedHook` rejects naked swaps and admits Pulse-bound swaps that atomically reveal the commitment. |
 | `bun run scripts/violation-and-rollback-demo.ts` | The atomic-reveal rollback gap is real (status returns to Pending after the cheating-swap revert), and the off-chain watcher closes it by calling `Pulse.reveal` directly to lock in `Violated`. |
 | `bun run scripts/sealed-inference-demo.ts` | A 0G-attested qwen reasoning blob is hashed into `reasoningCID` and anchored on chain in a real Pulse commitment. |
-| `bun run scripts/phase8-tradingapi-demo.ts` | A live Uniswap Trading API quote (mainnet UniswapX DUTCH_V2, real liquidity) is normalized into `intentHash`+`reasoningCID` and committed on Base Sepolia. The commitment carries the quote's `requestId` so anyone can re-pull and verify. |
+| `bun run scripts/phase8-tradingapi-demo.ts` | A live Uniswap Trading API quote (mainnet UniswapX DUTCH_V2, real liquidity) is normalized into `intentHash`+`reasoningCID` and committed on Eth Sepolia. The commitment carries the quote's `requestId` so anyone can re-pull and verify. |
 | `bun run scripts/watch-and-slash.ts` | Long-running watcher service that does the rollback recovery automatically. |
 
 ### Tests: 17 passing
@@ -377,12 +377,12 @@ container under `hermes-sandbox/`. The plumbing is verified end-to-end:
 | --- | --- |
 | Hermes container builds + starts | ✓ `./hermes-sandbox/up.sh` (image: `hermes-agent`, dashboard on :9119) |
 | All 5 pulse skills loaded as `local`/`enabled` | ✓ `hermes skills list` lists `pulse-commit`, `pulse-reveal`, `pulse-status-check`, `pulse-gated-swap`, `sealed-inference-with-pulse` |
-| Skill runtime (`bun` + viem + `.env`) inside container | ✓ `up.sh` installs `bun` post-start; `bun run scripts/exercise-gated-swap.ts` runs from inside the container against Base Sepolia |
+| Skill runtime (`bun` + viem + `.env`) inside container | ✓ `up.sh` installs `bun` post-start; `bun run scripts/exercise-gated-swap.ts` runs from inside the container against Eth Sepolia |
 | Repo + `~/.hermes` bind-mounted into the container | ✓ `docker-compose.override.yml` mounts repo at `/workspace/ethglobal-openagents` |
 | Anthropic OAuth from Claude Code | ✓ `./auth.sh` reads the macOS Keychain entry `Claude Code-credentials` (filtered by `-a $USER` so it grabs the live entry, not a stale one from a prior install), drops the JSON at the doc-canonical path `~/.claude/.credentials.json` inside the container, and pins `model.provider: "anthropic"` in `config.yaml`. Hermes auto-seeds it into the Anthropic credential pool. |
 | Subscription routing (Pro/Max) | ✓ `auth.sh` also disables Hermes's heavyweight tool catalog (`web`, `browser`, `vision`, `image_gen`, `tts`, `session_search`, `clarify`, `delegation`, `cronjob`, `messaging`, `code_execution`, `memory`, `todo`) and empties `SOUL.md`. **Why:** Anthropic's Claude Pro/Max subscription quota is gated on per-request body size — a stock Hermes request with 27 tools (~35KB) gets billed via the "extra usage" pool and 402s with extra-usage off; a trimmed request (≤~23KB) routes to the subscription. Discovered by bisection on the live API. |
 | Live one-shot chat | ✓ `docker exec -it --user hermes hermes hermes -z "Reply with PONG" --provider anthropic -m claude-haiku-4-5` returns `PONG` cleanly. |
-| Pulse-bound prompt | ✓ Hermes was asked "query Pulse contract for commitment 16 status on Base Sepolia"; agent used `terminal` tool to run `cast call ... getStatus(uint256)`, parsed the result, and answered correctly: **Status Found: 0 = Pending — committed but not yet revealed**. |
+| Pulse-bound prompt | ✓ Hermes was asked "query Pulse contract for commitment 4 status on Eth Sepolia"; agent used `terminal` tool to run `cast call ... getStatus(uint256)`, parsed the result, and answered correctly: **Status Found: 0 = Pending — committed but not yet revealed**. |
 
 The wiring follows Hermes's `providers.md` recipe verbatim — Claude Code's
 credential store stays the single source of truth, no token copies into
@@ -397,7 +397,7 @@ Then issue a pulse-bound prompt:
 
 ```bash
 docker exec -it --user hermes hermes hermes \
-  -z "Use the pulse-commit skill to commit agent 5263 to selling 0.01 pETH for at least 1800 pUSD on Base Sepolia. Use a 30-second executeAfter and 10-minute reveal window." \
+  -z "Use the pulse-commit skill to commit agent 3906 to selling 0.01 pETH for at least 1800 pUSD on Eth Sepolia. Use a 30-second executeAfter and 10-minute reveal window." \
   --provider anthropic -m claude-haiku-4-5
 ```
 
@@ -407,9 +407,9 @@ docker exec -it --user hermes hermes hermes \
 
 Initial protocol drop. Tagged so graders can pin to a specific commit.
 
-- **Contracts deployed on Base Sepolia.** `Pulse.sol`
-  ([`0xbe1b…BF34`](https://sepolia.basescan.org/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34))
-  and `PulseGatedHook` ([`0x137002…8080`](https://sepolia.basescan.org/address/0x137002596a3a818B36d82490cF79B35c376e8080))
+- **Contracts deployed on Eth Sepolia.** `Pulse.sol`
+  ([`0xbe1b…BF34`](https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34))
+  and `PulseGatedHook` ([`0x274b…c080`](https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080))
   with mocks `pUSD` + `pWETH` and a wide-range LP position via `script/Phase2.s.sol`.
 - **Six live demos.** `e2e-commit-reveal`, `exercise-gated-swap`,
   `violation-and-rollback-demo`, `sealed-inference-demo`, `phase8-tradingapi-demo`,
@@ -417,7 +417,7 @@ Initial protocol drop. Tagged so graders can pin to a specific commit.
 - **17 tests passing.** Pulse + PulseGatedHook with the real `Deployers` /
   `HookTest` utilities from v4-core / uniswap-hooks.
 - **Hermes integration verified end-to-end.** Agent prompt → Pulse contract
-  read on Base Sepolia, billed against Claude Max OAuth subscription. See
+  read on Eth Sepolia, billed against Claude Max OAuth subscription. See
   [`hermes-sandbox/AUTH_NOTES.md`](hermes-sandbox/AUTH_NOTES.md) for the
   two non-obvious blockers (stale Keychain entry, body-size gate) and
   the fixes baked into `auth.sh`.

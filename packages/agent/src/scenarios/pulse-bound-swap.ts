@@ -21,7 +21,7 @@
 
 import {createPublicClient, createWalletClient, http, type Address, type Hex} from "viem";
 import {privateKeyToAccount} from "viem/accounts";
-import {baseSepolia} from "viem/chains";
+import {sepolia} from "viem/chains";
 import {randomBytes} from "node:crypto";
 
 import {
@@ -68,7 +68,7 @@ interface ScenarioConfig {
 }
 
 export async function runPulseBoundSwap(cfg: ScenarioConfig) {
-    const publicClient = createPublicClient({chain: baseSepolia, transport: http(cfg.rpcUrl)});
+    const publicClient = createPublicClient({chain: sepolia, transport: http(cfg.rpcUrl)});
 
     // 1. Resolve agent provenance — prefer ENS, fall back to env
     let agentId: bigint;
@@ -118,7 +118,7 @@ export async function runPulseBoundSwap(cfg: ScenarioConfig) {
 
     // 3. Quote the swap via Uniswap Trading API (V4-routed for hook compatibility)
     const quote = await quoteSwap({
-        tokenInChainId: 84532, // Base Sepolia
+        tokenInChainId: 84532, // Eth Sepolia
         tokenOutChainId: 84532,
         tokenIn: cfg.swap.tokenIn,
         tokenOut: cfg.swap.tokenOut,
@@ -149,7 +149,7 @@ export async function runPulseBoundSwap(cfg: ScenarioConfig) {
     // 5. Commit onchain via Pulse
     const wallet = createWalletClient({
         account: privateKeyToAccount(cfg.fallback.agentPrivateKey),
-        chain: baseSepolia,
+        chain: sepolia,
         transport: http(cfg.rpcUrl)
     });
     const executeAfter = BigInt(Math.floor(Date.now() / 1000)) + cfg.executeAfterSeconds;
@@ -204,7 +204,7 @@ async function readCommitmentIdFromCommitTx(
 // ─── Entrypoint when run directly via `bun run demo:swap` ───────────────────
 if (import.meta.url === `file://${process.argv[1]}`) {
     const cfg: ScenarioConfig = {
-        rpcUrl: process.env.BASE_SEPOLIA_RPC_URL!,
+        rpcUrl: process.env.SEPOLIA_RPC_URL!,
         pulseAddress: process.env.PULSE_ADDRESS! as Address,
         poolManager: process.env.POOL_MANAGER! as Address,
         agentENSName: process.env.AGENT_ENS_NAME,

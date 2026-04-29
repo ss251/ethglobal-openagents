@@ -302,7 +302,7 @@ trade_box = add_box(off_xs, 4, OFF_CHAIN_TOP, OFF_BOX_H,
                     logo="uniswap", color="#c92a2a", bg="#ffe3e3", title_size=15)
 
 # ── ON-CHAIN band ────────────────────────────────────────────────────────
-elements.append(text(60, ON_CHAIN_TOP - 50, "Base Sepolia  (chainId 84532)",
+elements.append(text(60, ON_CHAIN_TOP - 50, "Eth Sepolia  (chainId 84532)",
                      size=20, color="#0b7285", align="left", w=600))
 add_logo("base", 410, ON_CHAIN_TOP - 56, 32)
 

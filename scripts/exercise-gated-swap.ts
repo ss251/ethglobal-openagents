@@ -1,5 +1,5 @@
 /**
- * End-to-end exerciser for the PulseGatedHook on Base Sepolia.
+ * End-to-end exerciser for the PulseGatedHook on Eth Sepolia.
  *
  * Demonstrates two paths through the same v4 pool:
  *   A.  Naked swap with no hookData            → hook reverts (MalformedHookData)
@@ -25,10 +25,10 @@ import {
     type Hex
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
-import {baseSepolia} from "viem/chains";
+import {sepolia} from "viem/chains";
 import {randomBytes} from "node:crypto";
 
-const RPC = process.env.BASE_SEPOLIA_RPC_URL!;
+const RPC = process.env.SEPOLIA_RPC_URL!;
 const PULSE = process.env.PULSE_ADDRESS! as Address;
 const HOOK = process.env.HOOK_ADDRESS! as Address;
 const SWAP_ROUTER = process.env.POOL_SWAP_TEST! as Address;
@@ -44,8 +44,8 @@ const AGENT_ID = BigInt(process.env.AGENT_ID!);
 const agent = privateKeyToAccount(AGENT_KEY);
 const tee = privateKeyToAccount(TEE_KEY);
 
-const publicClient = createPublicClient({chain: baseSepolia, transport: http(RPC)});
-const walletClient = createWalletClient({account: agent, chain: baseSepolia, transport: http(RPC)});
+const publicClient = createPublicClient({chain: sepolia, transport: http(RPC)});
+const walletClient = createWalletClient({account: agent, chain: sepolia, transport: http(RPC)});
 
 // ─── Constants ────────────────────────────────────────────────────────────
 const MIN_SQRT_PRICE = 4295128740n;  // TickMath.MIN_SQRT_PRICE + 1
@@ -162,22 +162,23 @@ async function ensureFundedAndApproved() {
     });
     if (balance < parseEther("1")) {
         console.log("  → minting 100 token0 + 100 token1 to AGENT");
+        // Sequential — public RPC nodes (e.g. publicnode) reject parallel
+        // sends from the same EOA with "replacement transaction underpriced"
+        // because nonces collide before the first tx is included.
         const tx0 = await walletClient.writeContract({
             address: TOKEN0,
             abi: ERC20_ABI,
             functionName: "mint",
             args: [agent.address, parseEther("100")]
         });
+        await publicClient.waitForTransactionReceipt({hash: tx0});
         const tx1 = await walletClient.writeContract({
             address: TOKEN1,
             abi: ERC20_ABI,
             functionName: "mint",
             args: [agent.address, parseEther("100")]
         });
-        await Promise.all([
-            publicClient.waitForTransactionReceipt({hash: tx0}),
-            publicClient.waitForTransactionReceipt({hash: tx1})
-        ]);
+        await publicClient.waitForTransactionReceipt({hash: tx1});
     }
     const allowance = await publicClient.readContract({
         address: TOKEN0,
@@ -193,16 +194,14 @@ async function ensureFundedAndApproved() {
             functionName: "approve",
             args: [SWAP_ROUTER, 2n ** 256n - 1n]
         });
+        await publicClient.waitForTransactionReceipt({hash: ax0});
         const ax1 = await walletClient.writeContract({
             address: TOKEN1,
             abi: ERC20_ABI,
             functionName: "approve",
             args: [SWAP_ROUTER, 2n ** 256n - 1n]
         });
-        await Promise.all([
-            publicClient.waitForTransactionReceipt({hash: ax0}),
-            publicClient.waitForTransactionReceipt({hash: ax1})
-        ]);
+        await publicClient.waitForTransactionReceipt({hash: ax1});
     }
 }
 
@@ -315,7 +314,7 @@ async function pulseBoundSwap() {
 
 async function main() {
     console.log("══════════════════════════════════════════════════════════════════");
-    console.log(" PulseGatedHook exerciser — Base Sepolia");
+    console.log(" PulseGatedHook exerciser — Eth Sepolia");
     console.log("══════════════════════════════════════════════════════════════════");
     console.log(`  Pulse:      ${PULSE}`);
     console.log(`  Hook:       ${HOOK}`);

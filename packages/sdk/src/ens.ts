@@ -80,7 +80,13 @@ export interface ResolveAgentArgs {
     resolverAddress?: Address;
 }
 
-const DEFAULT_PUBLIC_RESOLVER: Address = "0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63";
+/// Public Resolver addresses per chain.  Mainnet ENS lives at the first;
+/// the Sepolia ENS deployment uses a different resolver.  Pulse defaults
+/// to Sepolia for the v0.1 testnet demo; pass `resolverAddress` explicitly
+/// to override (e.g. when reading mainnet records).
+///   Sepolia (chainId 11155111): 0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5
+///   Mainnet (chainId 1):        0xF29100983E058B709F3D539b0c765937B804AC15
+const DEFAULT_PUBLIC_RESOLVER: Address = "0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5";
 
 /// Resolve an agent's full provenance from its ENS name.
 /// Reads address (coinType=60) + the four standard Pulse text records.

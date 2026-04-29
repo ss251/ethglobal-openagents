@@ -30,10 +30,10 @@ import {
     type Hex
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
-import {baseSepolia} from "viem/chains";
+import {sepolia} from "viem/chains";
 import {randomBytes} from "node:crypto";
 
-const RPC = process.env.BASE_SEPOLIA_RPC_URL!;
+const RPC = process.env.SEPOLIA_RPC_URL!;
 const PULSE = process.env.PULSE_ADDRESS! as Address;
 const HOOK = process.env.HOOK_ADDRESS! as Address;
 const SWAP_ROUTER = process.env.POOL_SWAP_TEST! as Address;
@@ -51,9 +51,9 @@ const agent = privateKeyToAccount(AGENT_KEY);
 const tee = privateKeyToAccount(TEE_KEY);
 const watcher = privateKeyToAccount(WATCHER_KEY);
 
-const publicClient = createPublicClient({chain: baseSepolia, transport: http(RPC)});
-const agentWallet = createWalletClient({account: agent, chain: baseSepolia, transport: http(RPC)});
-const watcherWallet = createWalletClient({account: watcher, chain: baseSepolia, transport: http(RPC)});
+const publicClient = createPublicClient({chain: sepolia, transport: http(RPC)});
+const agentWallet = createWalletClient({account: agent, chain: sepolia, transport: http(RPC)});
+const watcherWallet = createWalletClient({account: watcher, chain: sepolia, transport: http(RPC)});
 
 const MIN_SQRT_PRICE = 4295128740n;
 const STATUS_LABELS = ["Pending", "Revealed", "Violated", "Expired"] as const;
