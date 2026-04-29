@@ -9,6 +9,98 @@ GitHub Releases mirror this file; see
 <https://github.com/ss251/ethglobal-openagents/releases> for downloadable
 archives at each tag.
 
+## [0.8.0] — 2026-04-30 — Deep ENS integration
+
+Per Greg Skril's "Identity for Apps, Agents & More with ENS" workshop at
+ETHGlobal Open Agents 2026, ENS rewards depth — using the protocol as
+"the integration layer everywhere your app or agent interacts with a
+hex address." v0.8.0 takes the existing ENS surface (5 text records +
+`pulseProvenanceFromENS`) and adds four orthogonal axes that any
+ENS-aware client can leverage.
+
+### Added
+
+- **ENSIP-25 verification record on `pulseagent.eth`.** Implements the
+  October 2025 draft spec ([authors](https://docs.ens.domains/ensip/25):
+  premm.eth, raffy.eth, workemon.eth, ses.eth) for cryptographically
+  binding an ENS name to a specific on-chain agent registry entry.
+  - `packages/sdk/src/ensip25.ts` — full module: `encodeERC7930Address`,
+    `decodeERC7930Address`, `ensip25TextRecordKey`, `readENSIP25`,
+    `writeENSIP25`, plus the `ENSIP25_PULSE` preset for the Eth Sepolia
+    ERC-8004 IdentityRegistry. Re-exported from `@pulse/sdk`.
+  - `scripts/ens-set-ensip25.ts` — sets the canonical record:
+    `agent-registration[<7930-encoded registry>][3906] = "1"`. Live tx
+    `0x14cc4c52…8190` — record now resolves on chain.
+  - The ERC-7930 encoding for our case:
+    `0x0001000003aa36a7148004a818bfb912233c491871b3d84c89a494bd9e`
+    (version + eip155 + Sepolia chainId 0xaa36a7 + 20-byte registry addr).
+
+- **IPFS content hash on `pulseagent.eth`.** The gate frontend
+  (`apps/gate/`) is pinned via local kubo + announced to the public
+  IPFS DHT at CIDv1 `bafybeifm254qivolkzsiu6ewx4zvff3xqvujoxotkh5uoaj3gptp5fyz6i`
+  and bound to `pulseagent.eth`'s contenthash via the Sepolia Public
+  Resolver (tx `0x8bb3ac30…3638`).
+  - `scripts/ens-set-contenthash.ts` — Foundry-script-style runner.
+    Encodes the CID through `@ensdomains/content-hash` into the canonical
+    ENSIP-7 byte string (`0xe301…` for IPFS) and writes via
+    `setContenthash`.
+  - Reachable via `https://bafybeifm254qivolkzsiu6ewx4zvff3xqvujoxotkh5uoaj3gptp5fyz6i.ipfs.dweb.link/`
+    and `https://ipfs.io/ipfs/bafybeifm254qivolkzsiu6ewx4zvff3xqvujoxotkh5uoaj3gptp5fyz6i/`
+    today; eth.limo / eth.link are mainnet-only and so don't serve
+    Sepolia names — that's a Sepolia-vs-mainnet limit, not a Pulse limit.
+
+- **Smart contracts named via ENS subnames.** Each deployed contract has
+  a self-documenting subname under `pulseagent.eth`, with description
+  text records:
+  - `pulse.pulseagent.eth` → `Pulse.sol` on Eth Sepolia
+  - `hook.pulseagent.eth` → `PulseGatedHook` on Eth Sepolia
+  - `gate.pulseagent.eth` → `PulseGatedGate` (v0.7.0) on Eth Sepolia
+  - `inft.pulseagent.eth` → `PulseAgentINFT` (ERC-7857) on 0G Galileo
+  - `scripts/ens-name-contracts.ts` — creates each subname via
+    `ENSRegistry.setSubnodeRecord` + `PublicResolver.setAddr` +
+    `setText("description", …)`. 12 successful txs total (3 per subname).
+
+- **ENS resolution in the gate frontend.** Type `pulseagent.eth` (or any
+  `*.eth`) instead of a numeric agent id — the page resolves via the
+  `agentId` text record, runs the gate, and displays a phosphor-green
+  `✓ ENSIP-25 VERIFIED` badge with the canonical record key when the
+  ENSIP-25 binding is set. Falls back gracefully to numeric input.
+
+### Bumped
+
+- `@pulse/sdk` re-exports the ENSIP-25 module + new helpers.
+- `apps/gate/index.html` — ENS input + ENSIP-25 verification panel + the
+  panel's phosphor / amber styling.
+- `package.json` — added `@ensdomains/content-hash@3.0.0` (build-time
+  dep used by `ens-set-contenthash.ts`).
+- README + CHANGELOG + SUBMISSION + apps/gate/README updated to point
+  at the new artifacts.
+
+### Verified
+
+- ENSIP-25 record reads back as `"1"` from the resolver.
+- Contenthash record reads back as
+  `0xe30101701220acd7790455cb56648a7896bf335297778568975dd351fb47013b33e6fe9719f2`.
+- All 4 subnames resolve via `cast call resolver "addr(bytes32)"` on
+  Sepolia Public Resolver; description text records readable too.
+- Gate frontend live verification: `?agent=pulseagent.eth` resolves →
+  agent #3906 → RHYTHM NORMAL + `✓ ENSIP-25 VERIFIED` badge.
+
+### Why this matters for the ENS prize
+
+The workshop framed two prize tracks ($1,250 each): "best ENS
+integration for AI agents" and "most creative use of ENS." This release
+hits four high-leverage angles spec-by-spec:
+
+| Spec / pattern | Used? |
+| --- | --- |
+| Text records (ENSIP-5/18) | ✓ — 6 records on the parent name |
+| Multichain addresses (ENSIP-9/11) | partial — naming Sepolia + 0G contracts via subnames |
+| Contenthash (ENSIP-7) | ✓ — gate frontend pinned to IPFS, set on chain |
+| Subnames | ✓ — 4 contract subnames + workshop-style namespace pattern |
+| ENSIP-25 (agent registry verification) | ✓ — canonical record set, read by frontend |
+| Reverse registrar / primary names | open (not yet) |
+
 ## [0.7.0] — 2026-04-30 — PulseGatedGate: the read-side reference consumer
 
 The integration story up through v0.6.0 was supply-side complete (any

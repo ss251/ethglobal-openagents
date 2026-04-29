@@ -421,6 +421,12 @@ contract changes.
 | **Pulse Mock WETH (`pWETH`)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Etherscan](https://sepolia.etherscan.io/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
 | **PulseGatedGate** | `0x4d11e22268b8512B01dA7182a52Ba040A0709379` | [Etherscan](https://sepolia.etherscan.io/address/0x4d11e22268b8512B01dA7182a52Ba040A0709379) |
 
+ENS-named via [`pulse.pulseagent.eth`](https://sepolia.app.ens.domains/pulse.pulseagent.eth) /
+[`hook.pulseagent.eth`](https://sepolia.app.ens.domains/hook.pulseagent.eth) /
+[`gate.pulseagent.eth`](https://sepolia.app.ens.domains/gate.pulseagent.eth) /
+[`inft.pulseagent.eth`](https://sepolia.app.ens.domains/inft.pulseagent.eth)
+on Sepolia ENS — see the ENS section below.
+
 Pool: `pUSD ↔ pWETH`, fee `0.3%`, tickSpacing 60, initialized at 1:1 with a
 wide-range LP position via `script/Phase2.s.sol`.
 
@@ -448,13 +454,34 @@ made. Transfer or clone the iNFT and the new owner inherits the full rep
 trail — drift is provable across owners.
 
 **Agent identity (ENS).** [`pulseagent.eth`](https://sepolia.app.ens.domains/pulseagent.eth)
-on Sepolia ENS is the human-readable handle for the agent. Five text records
-(`agentId`, `signerProvider`, `pulseHistory`, `description`, `avatar`) are
-bound via the Public Resolver, so downstream tooling can take just the name
-and resolve `(addr, agentId, TEE signer)` without ever reading the `.env`.
-The `pulseProvenanceFromENS()` helper in `@pulse/sdk` does exactly that, and
-`scripts/ens-bind-demo.ts` exercises it end-to-end (writes records, resolves
-back, commits via Pulse using only ENS-resolved data).
+on Sepolia ENS is the human-readable handle for the agent. v0.8.0 deepens
+the ENS surface across four axes:
+
+- **Profile records** — `agentId`, `signerProvider`, `pulseHistory`,
+  `description`, `avatar`, plus `0g.inft = 0g-galileo:16602:0x180D…:1`
+  cross-linking the iNFT. Resolved by `pulseProvenanceFromENS()` in
+  `@pulse/sdk` and exercised by `scripts/ens-bind-demo.ts`.
+- **ENSIP-25 verification** — the canonical [ENSIP-25](https://docs.ens.domains/ensip/25)
+  text record `agent-registration[<erc-7930-encoded registry>][3906] = "1"`
+  is set on `pulseagent.eth`, formally binding the name to ERC-8004 agent
+  #3906 on Eth Sepolia. ERC-7930 encoder + read/write helpers ship in
+  `@pulse/sdk` (`encodeERC7930Address`, `readENSIP25`, `writeENSIP25`,
+  `ENSIP25_PULSE`). Set live via `scripts/ens-set-ensip25.ts`. The gate
+  frontend reads this record and shows a `✓ ENSIP-25 VERIFIED` badge when
+  resolving an agent by ENS name.
+- **Decentralized hosting** — the gate frontend (`apps/gate/`) is pinned to
+  IPFS at CIDv1 [`bafybeifm254qivolkzsiu6ewx4zvff3xqvujoxotkh5uoaj3gptp5fyz6i`](https://bafybeifm254qivolkzsiu6ewx4zvff3xqvujoxotkh5uoaj3gptp5fyz6i.ipfs.dweb.link/),
+  bound via `setContenthash` on the Sepolia Public Resolver. Any
+  ENS-aware client resolves `pulseagent.eth` → IPFS content. (eth.limo
+  serves mainnet ENS only, so testnet demos use the canonical IPFS URL.)
+- **Named smart contracts** — every deployed contract has its own ENS
+  subname so block explorers and integrators don't deal in raw hex:
+  - [`pulse.pulseagent.eth`](https://sepolia.app.ens.domains/pulse.pulseagent.eth) → Pulse.sol
+  - [`hook.pulseagent.eth`](https://sepolia.app.ens.domains/hook.pulseagent.eth) → PulseGatedHook
+  - [`gate.pulseagent.eth`](https://sepolia.app.ens.domains/gate.pulseagent.eth) → PulseGatedGate (v0.7.0)
+  - [`inft.pulseagent.eth`](https://sepolia.app.ens.domains/inft.pulseagent.eth) → PulseAgentINFT (0G Galileo)
+  Created via `scripts/ens-name-contracts.ts` (one `setSubnodeRecord`
+  + `setAddr` + `setText` per subname; 12 txs total).
 
 Full deployment record (constructor args, gas, dependencies) at
 [`deployments/sepolia.json`](deployments/sepolia.json).
@@ -654,7 +681,7 @@ Release notes live in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog
 format). Tagged releases with downloadable archives are mirrored to
 [GitHub Releases](https://github.com/ss251/ethglobal-openagents/releases).
 
-Latest: [v0.7.0 — PulseGatedGate: read-side reference consumer](CHANGELOG.md#070--2026-04-30--pulsegatedgate-the-read-side-reference-consumer).
+Latest: [v0.8.0 — Deep ENS integration: ENSIP-25 + IPFS contenthash + named contracts + gate ENS input](CHANGELOG.md#080--2026-04-30--deep-ens-integration).
 
 ## License
 

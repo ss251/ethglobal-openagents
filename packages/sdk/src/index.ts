@@ -25,6 +25,17 @@ export type {QuoteRequest, QuoteResponse} from "./trading.js";
 export type {AgentENSRecord, ResolveAgentArgs, SetAgentRecordsArgs} from "./ens.js";
 
 export {
+    encodeERC7930Address,
+    decodeERC7930Address,
+    ensip25TextRecordKey,
+    readENSIP25,
+    writeENSIP25,
+    ENSIP25_PULSE,
+    ENS_REGISTRY_ADDRESS
+} from "./ensip25.js";
+export type {DecodedERC7930} from "./ensip25.js";
+
+export {
     encryptStateBlob,
     decryptStateBlob,
     buildMintProof,

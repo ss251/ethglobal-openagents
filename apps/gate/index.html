@@ -280,6 +280,41 @@
     border-bottom: 1px dashed var(--rule);
   }
 
+  /* ENSIP-25 verification panel */
+  .ensip25 {
+    margin: 0 22px 4px;
+    padding: 14px 18px;
+    border: 1px solid var(--rule);
+    background: rgba(255,255,255,0.012);
+    display: flex; flex-direction: column; gap: 6px;
+    border-left: 3px solid var(--phosphor);
+  }
+  .ensip25.pending { border-left-color: var(--amber); background: rgba(255,184,0,0.04); }
+  .ensip25.ok { border-left-color: var(--phosphor); background: rgba(0,255,107,0.04); }
+  .ensip25-row {
+    display: flex; gap: 14px; align-items: baseline;
+  }
+  .ensip25-badge {
+    font-family: var(--display); font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--phosphor); text-shadow: var(--phosphor-glow);
+  }
+  .ensip25.pending .ensip25-badge { color: var(--amber); text-shadow: none; }
+  .ensip25-name {
+    font-family: var(--mono); font-size: 13px; color: var(--paper); font-weight: 500;
+  }
+  .ensip25-detail {
+    font-size: 11px; color: var(--dim);
+    word-break: break-all;
+  }
+  .ensip25-detail code {
+    background: rgba(0,255,107,0.08); border-color: rgba(0,255,107,0.18);
+    color: var(--phosphor); font-size: 0.92em;
+  }
+  .ensip25.pending .ensip25-detail code {
+    background: rgba(255,184,0,0.08); border-color: rgba(255,184,0,0.2); color: var(--amber);
+  }
+
   /* meta footer */
   .meta {
     margin-top: 16px; padding: 14px 22px;
@@ -344,7 +379,7 @@
     <span class="console-label">▸ probe</span>
     <form id="f">
       <span class="prompt">id</span>
-      <input id="agentId" type="text" inputmode="numeric" placeholder="erc-8004 agent id  (e.g. 3906)" autocomplete="off" autofocus />
+      <input id="agentId" type="text" placeholder="ens name or erc-8004 agent id  (e.g. pulseagent.eth)" autocomplete="off" autofocus />
       <button id="check" type="submit">Trace</button>
     </form>
     <div id="status" class="status-msg" hidden></div>
@@ -355,10 +390,11 @@
 </main>
 
 <footer>
-  <div>Pulse — sealed agent commitments</div>
+  <div>Pulse — sealed agent commitments · hosted on IPFS via ENS contenthash</div>
   <div>
     <a href="https://github.com/ss251/ethglobal-openagents" target="_blank" rel="noopener">github</a> ·
     <a href="https://sepolia.app.ens.domains/pulseagent.eth" target="_blank" rel="noopener">pulseagent.eth</a> ·
+    <a href="https://docs.ens.domains/ensip/25" target="_blank" rel="noopener">ensip-25</a> ·
     <a href="https://8004scan.io" target="_blank" rel="noopener">8004scan</a>
   </div>
 </footer>
@@ -370,10 +406,14 @@ import { sepolia } from "https://esm.sh/viem@2.48.4/chains";
 // ─── deploy targets (override via URL) ─────────────────────────────────
 const params = new URLSearchParams(location.search);
 const REPUTATION = "0x8004B663056A597Dffe9eCcC1965A193B7388713";
+const IDENTITY_REGISTRY = params.get("identity") || "0x8004A818BFB912233c491871b3d84c89A494BD9e";
 const PULSE = params.get("pulse") || "0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34";
 const GATE = params.get("gate") || "0x4d11e22268b8512B01dA7182a52Ba040A0709379";
 const DEFAULT_THRESHOLD = BigInt(params.get("threshold") || "50");
 const RPC = params.get("rpc") || "https://ethereum-sepolia-rpc.publicnode.com";
+// ERC-7930 encoding of (chainId 11155111, IDENTITY_REGISTRY) — used by ENSIP-25.
+// Recomputed at submit-time if the user overrides --identity.
+let ERC7930_REGISTRY = "0x0001000003aa36a7148004a818bfb912233c491871b3d84c89a494bd9e";
 // PublicNode Sepolia caps eth_getLogs at 50_000 blocks per request, so we
 // chunk the lookback into LOG_CHUNK-sized windows walking backward from head.
 const LOG_CHUNK = BigInt(params.get("chunk") || "49000"); // stay under cap
@@ -388,6 +428,22 @@ const GATE_ABI = parseAbi([
   "function threshold() view returns (int128)",
   "function tag2Filter() view returns (string)",
 ]);
+
+// ─── ENSIP-25 helpers (ERC-7930 encode + canonical key) ──────────────────
+function encodeERC7930(chainId, address) {
+  // version(2) | namespace(2) | chainRefLen(1) | chainRef(N) | addrLen(1) | addr(20)
+  let n = BigInt(chainId);
+  const chainBytes = [];
+  while (n > 0n) { chainBytes.unshift(Number(n & 0xffn)); n >>= 8n; }
+  const head = "00010000";
+  const ref = chainBytes.map(b => b.toString(16).padStart(2, "0")).join("");
+  const lenHex = chainBytes.length.toString(16).padStart(2, "0");
+  const addrHex = address.toLowerCase().replace(/^0x/, "");
+  return "0x" + head + lenHex + ref + "14" + addrHex;
+}
+function ensip25Key(registry7930, agentId) {
+  return `agent-registration[${registry7930}][${agentId.toString()}]`;
+}
 
 // Pulse event signatures — decoded against the deployed Pulse.sol
 const PULSE_EVENTS = {
@@ -413,13 +469,34 @@ if (params.get("agent")) $agent.value = params.get("agent");
 $f.addEventListener("submit", async (e) => {
   e.preventDefault();
   reset();
-  const idStr = $agent.value.trim();
-  if (!/^\d+$/.test(idStr)) { fail("Enter a numeric ERC-8004 agent id."); return; }
-  const agentId = BigInt(idStr);
+  const raw = $agent.value.trim();
+  if (!raw) { fail("Enter an ENS name or numeric ERC-8004 agent id."); return; }
+
   $btn.disabled = true;
-  setStatus("connecting to Eth Sepolia · reading reputation registry");
   try {
+    let agentId;
+    let ensName = null;
+    if (/\.eth$/i.test(raw)) {
+      ensName = raw.toLowerCase();
+      setStatus(`resolving ${ensName} via ens.text("agentId")`);
+      agentId = await resolveEnsToAgentId(ensName);
+      if (agentId === null) {
+        fail(`ENS name has no agentId text record. Set it via scripts/ens-bind-demo.ts or pass the numeric id directly.`);
+        return;
+      }
+    } else if (/^\d+$/.test(raw)) {
+      agentId = BigInt(raw);
+    } else {
+      fail("Enter an ENS name (foo.eth) or numeric ERC-8004 agent id.");
+      return;
+    }
+
+    // Recompute ERC-7930 if the user overrode the registry via URL.
+    ERC7930_REGISTRY = encodeERC7930(11155111n, IDENTITY_REGISTRY);
+
+    setStatus("connecting to Eth Sepolia · reading reputation registry");
     const [threshold, tag2Filter] = await readGateConfig();
+
     setStatus("aggregating pulse-tagged feedback via getSummary");
     const summary = await client.readContract({
       address: REPUTATION,
@@ -430,16 +507,47 @@ $f.addEventListener("submit", async (e) => {
     const count = summary[0]; const score = summary[1]; const dec = summary[2];
     const tracked = count > 0n;
     const approved = tracked && BigInt(score) >= threshold;
+
+    setStatus("verifying ENSIP-25 binding");
+    const ensip25 = await readENSIP25Verification(ensName, agentId);
+
     setStatus("indexing recent commitment events");
     const timeline = await fetchTimeline(agentId);
+
     setStatus("");
-    render({ agentId, count, score: BigInt(score), dec, threshold, tag2Filter, approved, tracked, timeline });
+    render({ agentId, ensName, count, score: BigInt(score), dec, threshold, tag2Filter, approved, tracked, timeline, ensip25 });
   } catch (e) {
     fail("RPC error: " + (e?.shortMessage || e?.message || String(e)).slice(0, 220));
   } finally {
     $btn.disabled = false;
   }
 });
+
+// Resolve "*.eth" → ERC-8004 agent id by reading the canonical `agentId`
+// text record set by Pulse's ens-bind-demo.ts. Uses Sepolia ENS, since
+// pulseagent.eth lives there. Returns null if no record is set.
+async function resolveEnsToAgentId(name) {
+  try {
+    const id = await client.getEnsText({ name, key: "agentId", universalResolverAddress: undefined });
+    if (id && /^\d+$/.test(id)) return BigInt(id);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Read the canonical ENSIP-25 record. Skipped (returns "n/a") when the
+// caller passed a numeric agent id and there's no name to verify against.
+async function readENSIP25Verification(ensName, agentId) {
+  if (!ensName) return { applicable: false };
+  const key = ensip25Key(ERC7930_REGISTRY, agentId);
+  try {
+    const value = await client.getEnsText({ name: ensName, key });
+    return { applicable: true, key, value: value || "", verified: !!(value && value.length > 0) };
+  } catch {
+    return { applicable: true, key, value: "", verified: false };
+  }
+}
 
 async function readGateConfig() {
   if (!GATE) return [DEFAULT_THRESHOLD, ""];
@@ -519,7 +627,7 @@ async function safeLogs(args) {
 }
 
 // ─── render ─────────────────────────────────────────────────────────────
-function render({ agentId, count, score, dec, threshold, tag2Filter, approved, tracked, timeline }) {
+function render({ agentId, ensName, count, score, dec, threshold, tag2Filter, approved, tracked, timeline, ensip25 }) {
   const klass = !tracked ? "untracked" : approved ? "approved" : "rejected";
   const verdict = !tracked ? "NO SIGNAL" : approved ? "RHYTHM NORMAL" : "ARRHYTHMIA";
   const verdictSub = !tracked
@@ -542,16 +650,37 @@ function render({ agentId, count, score, dec, threshold, tag2Filter, approved, t
     ? `<div class="timeline">${timeline.map(rowHtml).join("")}</div>`
     : `<div class="empty">no commitment events in last ${formatLookback(LOG_CHUNK * BigInt(LOG_CHUNKS))} blocks</div>`;
 
+  // ENSIP-25 verification panel — only shown when the agent was identified
+  // by ENS name. Verified means the canonical agent-registration text
+  // record is set on the name. Authors of the spec: premm.eth, raffy.eth,
+  // workemon.eth, ses.eth.
+  const ensip25Panel = ensName && ensip25?.applicable
+    ? `
+      <div class="ensip25 ${ensip25.verified ? 'ok' : 'pending'}">
+        <div class="ensip25-row">
+          <span class="ensip25-badge">${ensip25.verified ? '✓ ENSIP-25 VERIFIED' : '⚠ ENSIP-25 NOT SET'}</span>
+          <span class="ensip25-name">${ensName}</span>
+        </div>
+        <div class="ensip25-detail">
+          ${ensip25.verified
+            ? `name attests binding to agent registry · text("${truncMid(ensip25.key, 60)}") = "${ensip25.value}"`
+            : `name has no <code>agent-registration[…][${agentId}]</code> record yet · run <code>scripts/ens-set-ensip25.ts --execute</code>`}
+        </div>
+      </div>
+    `
+    : "";
+
   $result.className = "scope " + klass;
   $result.innerHTML = `
     <div class="scope-head">
-      <div>OSCILLOSCOPE · agent <span class="agent">#${agentId.toString()}</span></div>
+      <div>OSCILLOSCOPE · ${ensName ? `<span class="agent">${ensName}</span>` : `agent <span class="agent">#${agentId.toString()}</span>`}</div>
       <div>${tag2Filter ? `tag2: ${tag2Filter}` : "tag2: any"} · decimals ${dec}</div>
     </div>
     <div class="verdict-line">
       <div class="verdict">${verdict}</div>
       <div class="sub">${verdictSub}</div>
     </div>
+    ${ensip25Panel}
     <div class="wave-wrap">
       <div class="axis-label">trace · pulse(t)</div>
       ${wave}
@@ -565,12 +694,20 @@ function render({ agentId, count, score, dec, threshold, tag2Filter, approved, t
       <a href="https://sepolia.etherscan.io/address/${REPUTATION}#readContract" target="_blank" rel="noopener">registry ↗</a>
       <a href="https://sepolia.etherscan.io/address/${PULSE}" target="_blank" rel="noopener">pulse ↗</a>
       ${GATE ? `<a href="https://sepolia.etherscan.io/address/${GATE}" target="_blank" rel="noopener">gate ↗</a>` : ""}
+      ${ensName ? `<a href="https://sepolia.app.ens.domains/${ensName}" target="_blank" rel="noopener">ens ↗</a>` : ""}
+      <a href="https://docs.ens.domains/ensip/25" target="_blank" rel="noopener">ensip-25 ↗</a>
       <a href="https://8004scan.io" target="_blank" rel="noopener">8004scan ↗</a>
     </div>
   `;
   $result.hidden = false;
   // count-up animate the pulse score
   animateNumber($result.querySelector(".cell:nth-child(2) dd"), Number(score));
+}
+
+function truncMid(s, max) {
+  if (s.length <= max) return s;
+  const half = Math.floor((max - 1) / 2);
+  return s.slice(0, half) + "…" + s.slice(-half);
 }
 
 function rowHtml(e) {
