@@ -1,7 +1,7 @@
 {
   "name": "pulse-skills",
-  "version": "0.5.0",
-  "description": "Galaxy-brain-resistant agent commitments. Drop-in skills any agent (OpenClaw, Hermes, ElizaOS, Eliza, LangChain, custom) can use to commit-reveal onchain intents with sealed-inference reasoning, ERC-8004 reputation, and optional Uniswap v4 hook-gated execution.",
+  "version": "0.6.0",
+  "description": "Galaxy-brain-resistant agent commitments. Drop-in skills any agent (OpenClaw, Hermes, ElizaOS, Eliza, LangChain, custom) can use to commit-reveal onchain intents with sealed-inference reasoning, ERC-8004 reputation, optional Uniswap v4 hook-gated execution, and KeeperHub-deployable expirer infrastructure.",
   "author": {
     "name": "Pulse",
     "homepage": "https://github.com/ss251/ethglobal-openagents"
@@ -18,7 +18,9 @@
     "sealed-inference",
     "0g-compute",
     "tee",
-    "galaxy-brain"
+    "galaxy-brain",
+    "keeperhub",
+    "expirer"
   ],
   "license": "MIT",
   "skills": [
@@ -30,6 +32,7 @@
     "./skills/pulse-recover",
     "./skills/pulse-introspect",
     "./skills/pulse-inft",
-    "./skills/sealed-inference-with-pulse"
+    "./skills/sealed-inference-with-pulse",
+    "./skills/keeperhub-bind"
   ]
 }

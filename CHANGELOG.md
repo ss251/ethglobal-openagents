@@ -9,6 +9,67 @@ GitHub Releases mirror this file; see
 <https://github.com/ss251/ethglobal-openagents/releases> for downloadable
 archives at each tag.
 
+## [0.6.0] — 2026-04-29 — KeeperHub-deployable expirer
+
+The expirer was Pulse's last piece of always-on operator infrastructure:
+without somebody calling `Pulse.markExpired(id)` on stuck Pending
+commitments past their reveal window, the agent's reputation never gets
+the `-500` slash it earned for missing the window, and `getStatus(id)`
+keeps reading "Pending" forever. v0.6.0 ports that logic to KeeperHub
+and ships an off-network fallback so the protocol team's operator burden
+for the expirer drops from "always-on box" to **none**.
+
+### Added
+
+- **`keeperhub/` directory** at the repo root with a [`README.md`](keeperhub/README.md) that
+  documents the operator-infra story, the workflow JSON, the local-script
+  fallback, and the boundary of what does *not* port (the
+  `watch-and-slash.ts` rollback recovery, which needs custom calldata
+  decoding outside KeeperHub's declarative steps).
+- **`keeperhub/workflows/pulse-mark-expired.json`** — KeeperHub workflow
+  (cron `*/5 * * * *`) with three steps: scan `Committed` events via
+  `eth_getLogs` → filter by `block.timestamp >= executeAfter +
+  revealWindow` → loop calling `Pulse.markExpired(id)` with
+  `gasLimit=500_000`. Workflow metadata includes a `fallback` block
+  pointing at the local script as the off-network ground truth.
+- **`scripts/keeperhub-mark-expired.ts`** — local sweep script.
+  Permissionless (any funded EOA can run it), BigInt-safe JSON output,
+  dry-run + execute modes, optional `--ids` for targeted cleanup. Filters
+  zero-state commitments via `commitTime > 0n` so the sweep stays
+  linear-bounded by issued cid count, not by `uint256` space. Failures
+  per id don't abort the sweep — independent loop, full results array
+  emitted with `markExpiredTx` on success and `error` on failure.
+- **`packages/plugins/pulse-skills/skills/keeperhub-bind/`** — agent skill
+  (v0.6.0) wrapping both shapes. Documents when to use the local script
+  vs the deployed workflow, the dead-state guard, the env contract,
+  and how this composes with `pulse-introspect` / `pulse-status-check`.
+  Registered in `plugin.json` and the marketplace manifest.
+- **README "KeeperHub integration" section** with the verified-live
+  numbers (8 commitments swept, ~30s sweep time, all status=Expired with
+  −500 ERC-8004 rep slash on chain), the two-shape table, and the
+  operator-infra-burden delta sentence.
+
+### Live verification
+
+Sweep run 2026-04-29 against the deployed Eth Sepolia Pulse
+(`0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34`):
+
+```
+8 commitments swept and expired:
+  cid #6, #7, #8, #11, #17, #21, #25, #26
+  → all status=Expired (3), -500 ERC-8004 rep slash each
+```
+
+Workflow shape and local-script shape produce identical behavior; the
+JSON's three steps and the script's three phases (scan → filter → loop
+markExpired) are line-for-line correspondent.
+
+### Bumped
+
+- `packages/plugins/pulse-skills/package.json`: `0.5.0` → `0.6.0`
+- `packages/plugins/pulse-skills/.claude-plugin/plugin.json`: `0.5.0` → `0.6.0` (registers `keeperhub-bind` skill, adds `keeperhub` + `expirer` keywords)
+- `packages/plugins/pulse-skills/.claude-plugin/marketplace.json`: `0.5.0` → `0.6.0`
+
 ## [0.5.0] — 2026-04-29 — Real composability + verified docs + LLM-discoverable
 
 The v0.4 ship had a real iNFT on chain but two product holes: (1) the

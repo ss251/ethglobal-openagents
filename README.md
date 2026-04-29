@@ -277,6 +277,8 @@ packages/
 └── plugins/
     └── pulse-skills/               # agent-agnostic skill bundle (any agent can install)
 hermes-sandbox/                     # Hermes (NousResearch) container wiring + SOUL.md persona
+keeperhub/                          # KeeperHub-deployable workflows + README (expirer infra)
+└── workflows/pulse-mark-expired.json
 docs/
 └── adr/                            # architecture-decision records
 ai/diagrams/                        # Mermaid + Excalidraw architecture diagrams
@@ -318,6 +320,7 @@ npx skills add ss251/ethglobal-openagents
 | `pulse-recover`                | Re-submit a gated swap when a previous run committed but the swap reverted. Same intent, same nonce.     |
 | `pulse-introspect`             | Inspect recent agent-wallet activity or a single commitment without writing a block-scanner.             |
 | `pulse-inft`                   | Mint or update an **ERC-7857 iNFT** on 0G that anchors the agent's encrypted state + ENS + ERC-8004 + commitment history into one transferable NFT. |
+| `keeperhub-bind`               | Sweep stuck-Pending commitments and call `Pulse.markExpired(id)` on each. Local sweep or KeeperHub-deployable cron workflow — replaces the off-chain expirer daemon Pulse used to need. |
 | `sealed-inference-with-pulse`  | Pull TEE-signed reasoning (0G Compute or any EIP-191 signer) and bind it to commit.                      |
 
 Framework adapter recipes for OpenClaw, Hermes, ElizaOS, LangChain,
@@ -341,6 +344,7 @@ The script surface is the public contract:
 | `scripts/pulse-introspect.ts`             | `pulse-introspect`          | Recent agent txs OR `--commitment-id N` deep dive      |
 | `scripts/pulse-retry.ts`                  | `pulse-recover`             | Recover Pending commitment after a swap revert         |
 | `scripts/inft-bind.ts`                    | `pulse-inft`                | Mint pulseagent.eth as an ERC-7857 iNFT on 0G + bind   |
+| `scripts/keeperhub-mark-expired.ts`       | `keeperhub-bind`            | Sweep stuck-Pending commitments past their reveal window |
 
 All scripts share `scripts/_lib/` (env loader, ABIs, direction-aware funding,
 Pulse helpers, BigInt-safe JSON output) so behavior is consistent across them.
@@ -576,13 +580,42 @@ was deleted in v0.2.0 because:
 
 The Hermes gateway is the canonical shape. We followed the docs.
 
+### KeeperHub integration — operator infrastructure as a workflow
+
+Pulse needs an off-chain expirer that calls `Pulse.markExpired(id)` on
+every Pending commitment past its reveal window. Without it, stuck
+commitments stay Pending forever and the agent's reputation never gets
+the −500 slash it earned for missing the window. Pre-v0.6 this required
+a long-running box somewhere — exactly the kind of always-on operator
+infrastructure KeeperHub was built to eliminate.
+
+[`keeperhub/`](keeperhub/) ports that logic to two interchangeable shapes:
+
+| Shape | File | When |
+| --- | --- | --- |
+| KeeperHub workflow (cron `*/5 * * * *`) | [`keeperhub/workflows/pulse-mark-expired.json`](keeperhub/workflows/pulse-mark-expired.json) | Default for production. Keeper network handles cron + gas; protocol team handles nothing. |
+| Local sweep (any funded EOA) | [`scripts/keeperhub-mark-expired.ts`](scripts/keeperhub-mark-expired.ts) | Off-network fallback or one-shot debug cleanup. `markExpired` is permissionless, so this *always* works. |
+| Agent skill | [`packages/plugins/pulse-skills/skills/keeperhub-bind/SKILL.md`](packages/plugins/pulse-skills/skills/keeperhub-bind/SKILL.md) | Surfaces both modes to any framework-agnostic agent. |
+
+Verified live on Eth Sepolia 2026-04-29: 8 stuck-Pending commitments
+(cids #6, #7, #8, #11, #17, #21, #25, #26) swept and marked Expired in
+~30 seconds, each with `−500` ERC-8004 reputation slash on chain. The
+local script and the workflow share the same dead-state guard
+(`commitTime > 0n`) and the same `gasLimit=500_000` for the
+giveFeedback-OOG floor, so the workflow's behavior is identical to a
+known-good local run. The boundary of what does *not* port (the
+`watch-and-slash` rollback recovery, which needs custom calldata
+decoding) is documented honestly in [`keeperhub/README.md`](keeperhub/README.md).
+
+**Operator-infra burden for the expirer: required → none.**
+
 ## Releases
 
 Release notes live in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog
 format). Tagged releases with downloadable archives are mirrored to
 [GitHub Releases](https://github.com/ss251/ethglobal-openagents/releases).
 
-Latest: [v0.5.0 — Real composability + verified docs + LLM-discoverable](CHANGELOG.md#050--2026-04-29--real-composability--verified-docs--llm-discoverable).
+Latest: [v0.6.0 — KeeperHub-deployable expirer + zero-operator-infra story](CHANGELOG.md#060--2026-04-29--keeperhub-deployable-expirer).
 
 ## License
 

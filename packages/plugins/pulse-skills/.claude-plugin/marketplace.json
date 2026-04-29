@@ -1,6 +1,6 @@
 {
   "name": "pulse-skills",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "owner": {
     "name": "Pulse"
   },
@@ -12,7 +12,7 @@
     {
       "name": "pulse-skills",
       "source": "./",
-      "description": "Pulse commit/reveal/check skills + Uniswap v4 hook-gated swap skill + sealed-inference skill"
+      "description": "Pulse commit/reveal/check skills + Uniswap v4 hook-gated swap skill + sealed-inference skill + ERC-7857 iNFT skill + KeeperHub expirer skill"
     }
   ]
 }

@@ -1,0 +1,79 @@
+{
+  "name": "pulse-mark-expired",
+  "description": "Sweep Pending Pulse commitments past their reveal windows and call Pulse.markExpired(id) on each. Slashes -500 ERC-8004 reputation per expired commitment. Replaces the off-chain expirer daemon Pulse used to need.",
+  "version": "1.0.0",
+  "trigger": {
+    "type": "schedule",
+    "cron": "*/5 * * * *",
+    "timezone": "UTC"
+  },
+  "chain": {
+    "id": 11155111,
+    "name": "ethereum-sepolia"
+  },
+  "steps": [
+    {
+      "id": "scan-stuck-commitments",
+      "type": "http",
+      "method": "POST",
+      "url": "{{secrets.SEPOLIA_RPC_URL}}",
+      "headers": {"content-type": "application/json"},
+      "body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_getLogs",
+        "params": [
+          {
+            "address": "{{secrets.PULSE_ADDRESS}}",
+            "fromBlock": "{{state.lastScannedBlock|default('0xa00000')}}",
+            "toBlock": "latest",
+            "topics": [
+              "0xCOMMITTED_TOPIC_HASH"
+            ]
+          }
+        ]
+      },
+      "output": "events",
+      "comment": "Replace COMMITTED_TOPIC_HASH with keccak256('Committed(uint256,uint256,bytes32,bytes32,uint64,uint64,address)') at deploy time. The full topic is documented in deployments/sepolia.json."
+    },
+    {
+      "id": "filter-expired",
+      "type": "filter",
+      "input": "{{steps.scan-stuck-commitments.events}}",
+      "predicate": "block.timestamp >= log.data.executeAfter + log.data.revealWindow",
+      "output": "expiredIds"
+    },
+    {
+      "id": "mark-each-expired",
+      "type": "loop",
+      "items": "{{steps.filter-expired.expiredIds}}",
+      "max_concurrency": 1,
+      "step": {
+        "id": "mark-expired",
+        "type": "contract-call",
+        "chain": 11155111,
+        "contract": "{{secrets.PULSE_ADDRESS}}",
+        "abi": {
+          "name": "markExpired",
+          "inputs": [{"name": "id", "type": "uint256"}],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        "args": ["{{item.id}}"],
+        "gasLimit": 500000,
+        "wallet": "{{secrets.KEEPER_WALLET_ID}}"
+      }
+    }
+  ],
+  "metadata": {
+    "tags": ["pulse-protocol", "erc-8004", "agent-reputation", "expirer"],
+    "owner": "pulse-protocol",
+    "documentation": "https://github.com/ss251/ethglobal-openagents/blob/main/keeperhub/README.md",
+    "fallback": {
+      "type": "manual",
+      "command": "bun run scripts/keeperhub-mark-expired.ts --execute",
+      "description": "Same logic, runnable locally with any funded EOA. Pulse.markExpired is permissionless."
+    }
+  }
+}

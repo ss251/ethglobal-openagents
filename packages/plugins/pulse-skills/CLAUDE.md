@@ -14,6 +14,7 @@ LangChain, or a custom Anthropic-API loop.
 | Need to read state before deciding what to do next                       | `pulse-status-check`           |
 | Action is a Uniswap v4 swap and you want execution gated by Pulse        | `pulse-gated-swap`             |
 | Need TEE-signed reasoning for the commit payload                         | `sealed-inference-with-pulse`  |
+| Stuck-Pending commitments past reveal window need to be cleaned up       | `keeperhub-bind`               |
 
 ## Reading order for new contributors
 
