@@ -9,6 +9,63 @@ GitHub Releases mirror this file; see
 <https://github.com/ss251/ethglobal-openagents/releases> for downloadable
 archives at each tag.
 
+## [0.9.0] — 2026-04-30 — PulseGatedLendingPool: second consumer pattern
+
+The strongest signal Pulse can ship pre-submission is *demand-side
+proof*. v0.7.0 gave us `PulseGatedGate` (the abstract gate primitive).
+v0.9.0 adds the next-question artifact: **what does that gate look like
+in a real-shaped onchain flow?** A minimal overcollateralized lending
+pool where the borrow path is gated on Pulse-tagged ERC-8004 reputation
+through a single `IPulseGate.assertGate(agentId)` call.
+
+### Added
+
+- **`contracts/gates/PulseGatedLendingPool.sol`** — supply / withdraw /
+  borrow / repay / liquidate, with the entire Pulse-specific surface
+  being `pulseGate.assertGate(agentId)` inside `borrow()`. Uses
+  OpenZeppelin SafeERC20 + ReentrancyGuard. Constants in immutables;
+  no oracle (deliberately — for prod, drop in a real one). Configurable
+  LTV + liquidation bps + price ratio at deploy time.
+- **`test/PulseGatedLendingPool.t.sol`** — 15 unit tests.
+  `vm.mockCall` against the registry interface for the gate path; a
+  `vm.store`-driven liquidation simulation (price oracle is immutable
+  in this minimal pool, so manual storage write is the cleanest way to
+  exercise the unhealthy-position branch). Suite total now **56/56**.
+- **`script/DeployLendingPool.s.sol`** — Foundry deploy script with
+  Eth Sepolia defaults: pETH collateral, pUSD debt, deployed
+  `PulseGatedGate` v0.7.0, 1:1 price, 50% LTV, 85% liquidation.
+- **`lend.pulseagent.eth`** ENS subname pointing at the deployed pool
+  (added to `scripts/ens-name-contracts.ts`'s default contract list).
+- **README** + **SUBMISSION** + **CHANGELOG** updated with the new
+  contract address, pool description, live-borrow tx hash, and bumped
+  56-test count.
+
+### Deployed live
+
+- `PulseGatedLendingPool` at
+  [`0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16`](https://sepolia.etherscan.io/address/0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16)
+  (alias `lend.pulseagent.eth`).
+- Seeded with 50,000 pUSD borrow liquidity.
+- End-to-end exercised as agent #3906 (`pulseagent.eth`):
+  - `approve` → `supply(0.1 pETH)` → `borrow(3906, 0.04 pUSD)` —
+    Pulse gate gated a real on-chain borrow at 40% LTV.
+  - Borrow tx: [`0xdb6e62d8e2dfcdbe36c316c45df4d725f88a99be4eece8f1e71cd5d653b45f7a`](https://sepolia.etherscan.io/tx/0xdb6e62d8e2dfcdbe36c316c45df4d725f88a99be4eece8f1e71cd5d653b45f7a)
+
+### Why this matters
+
+Per pre-submission strategy consult: the missing piece was *making
+economic inevitability obvious*. The gate was abstract; the lending
+pool is concrete. Borrowing is the cleanest archetype of "trust
+granted up front, settled later" — exactly the kind of decision that
+should be priced by on-chain reputation rather than off-chain KYC.
+The two-line integration pattern (`pulseGate.assertGate(agentId)`)
+is now demonstrably load-bearing: it's the difference between an
+agent moving real capital and bouncing off the contract.
+
+This is the artifact pre-submission DMs to HeyElsa / Almanak /
+Olas / Virtuals will point at: "here's what your borrow flow looks
+like with two lines of Pulse." Forkable in an afternoon.
+
 ## [0.8.0] — 2026-04-30 — Deep ENS integration
 
 Per Greg Skril's "Identity for Apps, Agents & More with ENS" workshop at

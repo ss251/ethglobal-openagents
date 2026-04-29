@@ -228,7 +228,7 @@ forge build
 forge test
 ```
 
-Should report **41 tests passing** (6 Pulse + 11 PulseGatedHook + 10 PulseAgentINFT + 14 PulseGatedGate).
+Should report **56 tests passing** (6 Pulse + 11 PulseGatedHook + 10 PulseAgentINFT + 14 PulseGatedGate + 15 PulseGatedLendingPool).
 
 Deploy Pulse to Eth Sepolia:
 
@@ -420,6 +420,7 @@ contract changes.
 | **Pulse Mock USD (`pUSD`)** | `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA` | [Etherscan](https://sepolia.etherscan.io/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA) |
 | **Pulse Mock WETH (`pWETH`)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Etherscan](https://sepolia.etherscan.io/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
 | **PulseGatedGate** | `0x4d11e22268b8512B01dA7182a52Ba040A0709379` | [Etherscan](https://sepolia.etherscan.io/address/0x4d11e22268b8512B01dA7182a52Ba040A0709379) |
+| **PulseGatedLendingPool** | `0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16` | [Etherscan](https://sepolia.etherscan.io/address/0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16) |
 
 ENS-named via [`pulse.pulseagent.eth`](https://sepolia.app.ens.domains/pulse.pulseagent.eth) /
 [`hook.pulseagent.eth`](https://sepolia.app.ens.domains/hook.pulseagent.eth) /
@@ -501,7 +502,7 @@ hashes you can open in Etherscan.
 | `bun run scripts/ens-bind-demo.ts` | Binds 5 text records on `pulseagent.eth`, resolves them back via `pulseProvenanceFromENS()`, then submits a `Pulse.commit` whose `agentId` and `signerProvider` come *only* from ENS — proves ENS does real work in the agent identity stack. |
 | `bun run scripts/watch-and-slash.ts` | Long-running watcher service that does the rollback recovery automatically. |
 
-### Tests: 41 passing
+### Tests: 56 passing
 
 - **Pulse (6)**: commit, reveal-match, reveal-mismatch, reveal-too-early,
   expire, wrong-signer, non-owner reverts.
@@ -516,6 +517,11 @@ hashes you can open in Etherscan.
 - **PulseGatedGate (14)**: gate above/at/below threshold, untracked agent
   rejection, assertGate revert paths, `checkAndLog` event emission, owner-
   gated `setThreshold` + `setTag2Filter`, ctor invariants and immutables.
+- **PulseGatedLendingPool (15)**: supply / withdraw paths, borrow gates
+  on Pulse rep (passes / fails / untracked), LTV ceiling enforcement,
+  repay flow, liquidation revert on healthy + success on unhealthy
+  positions (via `vm.store`), max-borrow + LTV view helpers, indexed-
+  agentId event emission, ctor invariants.
 
 ### Hermes integration — autonomous Pulse-bound trading agent in Telegram
 
@@ -646,6 +652,41 @@ story* is now load-bearing-real: a protocol team evaluating Pulse
 clones one file, sets two env vars, runs `forge script`, and gates
 their flow on Pulse reputation in an afternoon.
 
+### PulseGatedLendingPool — second consumer pattern (real-shaped)
+
+`PulseGatedGate` answers "does this agent pass?" — abstract. The next
+question integrators ask is "OK, what does that look like in a real
+flow?" `PulseGatedLendingPool` is the answer: a minimal
+overcollateralized credit primitive where the **borrow** path is gated
+on Pulse rep through `IPulseGate.assertGate`. Supply, repay, and
+liquidate stay permissionless — only borrowing trust requires reputation.
+
+```solidity
+function borrow(uint256 agentId, uint256 amount) external {
+    pulseGate.assertGate(agentId); // ← the entire Pulse surface
+    // … standard LTV check, debt accounting, transfer
+}
+```
+
+| Surface | File |
+| --- | --- |
+| Contract | [`contracts/gates/PulseGatedLendingPool.sol`](contracts/gates/PulseGatedLendingPool.sol) |
+| Tests | [`test/PulseGatedLendingPool.t.sol`](test/PulseGatedLendingPool.t.sol) (15 tests, including a `vm.store`-driven liquidation simulation) |
+| Deploy | [`script/DeployLendingPool.s.sol`](script/DeployLendingPool.s.sol) |
+
+**Verified live on Eth Sepolia**: deployed at
+`0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16` (alias
+[`lend.pulseagent.eth`](https://sepolia.app.ens.domains/lend.pulseagent.eth)),
+seeded with 50,000 pUSD of borrow liquidity, then exercised end-to-end
+as agent #3906: 0.1 pETH supplied, 0.04 pUSD borrowed (40% LTV) —
+[borrow tx `0xdb6e…5f7a`](https://sepolia.etherscan.io/tx/0xdb6e62d8e2dfcdbe36c316c45df4d725f88a99be4eece8f1e71cd5d653b45f7a).
+The Pulse gate gated a real on-chain borrow.
+
+This is the artifact downstream integrators (HeyElsa, Almanak, Olas
+etc.) can fork and repurpose. Borrowing is the cleanest archetype of
+"trust granted up front, settled later" — exactly the kind of decision
+that should be priced by on-chain reputation rather than off-chain KYC.
+
 ### KeeperHub integration — operator infrastructure as a workflow
 
 Pulse needs an off-chain expirer that calls `Pulse.markExpired(id)` on
@@ -681,7 +722,7 @@ Release notes live in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog
 format). Tagged releases with downloadable archives are mirrored to
 [GitHub Releases](https://github.com/ss251/ethglobal-openagents/releases).
 
-Latest: [v0.8.0 — Deep ENS integration: ENSIP-25 + IPFS contenthash + named contracts + gate ENS input](CHANGELOG.md#080--2026-04-30--deep-ens-integration).
+Latest: [v0.9.0 — PulseGatedLendingPool: second consumer pattern, live on Eth Sepolia](CHANGELOG.md#090--2026-04-30--pulsegatedlendingpool-second-consumer-pattern).
 
 ## License
 

@@ -116,6 +116,12 @@ const CONTRACTS: ContractEntry[] = [
         description: "PulseGatedGate — reference reputation-gate consumer (v0.7.0)",
     },
     {
+        label: "lend",
+        address: (process.env.LEND_ADDRESS ||
+            "0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16") as Address,
+        description: "PulseGatedLendingPool — overcollateralized borrow gated on Pulse reputation (v0.9.0)",
+    },
+    {
         label: "inft",
         address: (process.env.INFT_ADDRESS ||
             "0x180D8105dc415553e338BDB06251e8aC3e48227C") as Address,

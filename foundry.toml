@@ -14,6 +14,13 @@ fs_permissions = [
     {access = "read", path = "./lib"}
 ]
 
+[lint]
+# Forge 1.5+ runs Solar lint on every build. The uniswap-hooks lib has a
+# relative import inside test/utils that trips Solar's stricter rules —
+# but it isn't ours to fix and we don't consume that file in our tests.
+# Disable lint-on-build here; run `forge lint contracts/` explicitly when needed.
+lint_on_build = false
+
 [fmt]
 line_length = 110
 tab_width = 4

@@ -52,7 +52,7 @@ always-on expirer daemon Pulse used to need.
 - **Spec**: [SPEC.md](SPEC.md)
 - **Integrating in 30 minutes**: [INTEGRATING.md](INTEGRATING.md)
 - **LLM-discoverable**: [llms.txt](llms.txt) + [llms-full.txt](llms-full.txt)
-- **Tests**: 41 forge tests passing (6 Pulse + 11 PulseGatedHook + 10 PulseAgentINFT + 14 PulseGatedGate)
+- **Tests**: 56 forge tests passing (6 Pulse + 11 PulseGatedHook + 10 PulseAgentINFT + 14 PulseGatedGate + 15 PulseGatedLendingPool)
 
 ---
 
@@ -67,6 +67,7 @@ always-on expirer daemon Pulse used to need.
 | **pUSD (mock)** | `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA` | [Etherscan](https://sepolia.etherscan.io/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA) |
 | **pWETH (mock)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Etherscan](https://sepolia.etherscan.io/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
 | **PulseGatedGate** | `0x4d11e22268b8512B01dA7182a52Ba040A0709379` | [Etherscan](https://sepolia.etherscan.io/address/0x4d11e22268b8512B01dA7182a52Ba040A0709379) |
+| **PulseGatedLendingPool** | `0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16` | [Etherscan](https://sepolia.etherscan.io/address/0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16) |
 
 Wired to:
 - ERC-8004 IdentityRegistry `0x8004A818BFB912233c491871b3d84c89A494BD9e`
@@ -280,7 +281,7 @@ Pulse is shipped as a real consumable library, not a one-off demo:
 ```bash
 # 1. Tests still green
 forge test
-# expect: 41 passing (6 + 11 + 10 + 14)
+# expect: 56 passing (6 + 11 + 10 + 14 + 15)
 
 # 2. Sweep is idempotent (no stuck Pending left)
 bun run scripts/keeperhub-mark-expired.ts
