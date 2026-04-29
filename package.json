@@ -10,6 +10,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "openai": "^6.34.0",
     "viem": "^2.48.4"
   }
 }

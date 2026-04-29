@@ -34,6 +34,14 @@ docker compose \
   --project-directory upstream \
   up -d --build
 
+# Pulse skills shell out to `bun run scripts/...`. Hermes upstream's image
+# ships node+npm but not bun, so install it post-start as root. Idempotent:
+# bun's npm package skips the binary fetch if one is already present.
+echo
+echo "→ Ensuring bun is installed in the container (needed for pulse-skills)…"
+docker exec --user root hermes bash -c 'command -v bun >/dev/null || npm install -g --silent bun' 2>&1 | tail -5 || true
+docker exec hermes bash -c 'echo "  bun: $(bun --version 2>/dev/null || echo missing)"'
+
 echo
 echo "✓ Hermes is running."
 echo

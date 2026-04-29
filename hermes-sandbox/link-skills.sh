@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# Symlink Pulse SKILL.md bundles into ~/.hermes/skills/ so Hermes loads them.
+# Sync Pulse SKILL.md bundles into ~/.hermes/skills/ so Hermes loads them.
 #
 # Hermes loads skills from ~/.hermes/skills/<skill-name>/SKILL.md by default
 # (per https://hermes-agent.nousresearch.com/docs/user-guide/configuration/).
-# Our pulse-skills live at packages/plugins/pulse-skills/skills/* — symlinking
-# means edits in our repo flow through to Hermes immediately.
+# Our pulse-skills live at packages/plugins/pulse-skills/skills/*.
+#
+# We rsync (not symlink) because the Hermes Docker container bind-mounts
+# ~/.hermes into /opt/data — symlinks pointing back into the repo path
+# can't be resolved from inside the container.
+#
+# Re-run this script whenever you edit a SKILL.md.
 
 set -euo pipefail
 
@@ -20,32 +25,28 @@ fi
 
 mkdir -p "$SKILLS_DST"
 
-linked=0
-skipped=0
+synced=0
+removed=0
 
 for skill_dir in "$SKILLS_SRC"/*/; do
   skill_name="$(basename "$skill_dir")"
   target="$SKILLS_DST/$skill_name"
 
   if [ -L "$target" ]; then
-    # Existing symlink — refresh it
     rm "$target"
-  elif [ -e "$target" ]; then
-    echo "⚠ $target exists and is not a symlink; skipping"
-    skipped=$((skipped + 1))
-    continue
+    removed=$((removed + 1))
   fi
 
-  ln -s "$skill_dir" "$target"
-  echo "✓ linked $skill_name → $skill_dir"
-  linked=$((linked + 1))
+  rsync -a --delete "$skill_dir" "$target/"
+  echo "✓ synced $skill_name"
+  synced=$((synced + 1))
 done
 
 echo
-echo "Linked $linked skills, skipped $skipped."
-echo "Hermes will load them from: $SKILLS_DST"
+echo "Synced $synced skill(s) (removed $removed dangling symlinks)."
+echo "Hermes loads them from: $SKILLS_DST"
 echo
-echo "If you want to remove these later:"
+echo "Removal:"
 echo "  for s in pulse-commit pulse-reveal pulse-status-check pulse-gated-swap sealed-inference-with-pulse; do"
-echo "    rm \"$SKILLS_DST/\$s\""
+echo "    rm -rf \"$SKILLS_DST/\$s\""
 echo "  done"

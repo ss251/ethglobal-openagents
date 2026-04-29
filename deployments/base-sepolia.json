@@ -24,6 +24,29 @@
       "create2Salt": 57991,
       "permissionFlags": "0x0080",
       "permissionFlagsDecoded": "BEFORE_SWAP_FLAG only (no NoOp surface, no beforeSwapReturnDelta)"
+    },
+    "MockToken0_pUSD": {
+      "address": "0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA",
+      "name": "Pulse Mock USD",
+      "symbol": "pUSD",
+      "explorer": "https://sepolia.basescan.org/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA"
+    },
+    "MockToken1_pWETH": {
+      "address": "0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349",
+      "name": "Pulse Mock WETH",
+      "symbol": "pWETH",
+      "explorer": "https://sepolia.basescan.org/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349"
+    },
+    "PulseGatedV4Pool": {
+      "currency0": "0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA",
+      "currency1": "0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349",
+      "fee": 3000,
+      "tickSpacing": 60,
+      "hooks": "0x137002596a3a818B36d82490cF79B35c376e8080",
+      "initialSqrtPriceX96": "79228162514264337593543950336",
+      "initialLiquidity": "100000000000000000000",
+      "seedAmountPerSide": "1000000000000000000000000",
+      "note": "Initialized via script/Phase2.s.sol with a wide-range LP position."
     }
   },
   "dependencies": {

@@ -28,8 +28,22 @@ const PULSE_ABI = [
             {name: "actionData", type: "bytes"}
         ],
         outputs: [{name: "kept", type: "bool"}]
+    },
+    {
+        type: "function",
+        name: "markExpired",
+        stateMutability: "nonpayable",
+        inputs: [{name: "id", type: "uint256"}],
+        outputs: []
     }
 ] as const;
+
+/// reveal/markExpired internally call ReputationRegistry.giveFeedback through
+/// a try/catch. eth_estimateGas finds the OOG-success branch (catch swallows
+/// the inner OOG) and quotes far less gas than the inner storage writes need.
+/// Override these defaults per-call only if you've measured a tighter budget.
+export const DEFAULT_REVEAL_GAS = 600_000n;
+export const DEFAULT_MARK_EXPIRED_GAS = 500_000n;
 
 export async function commitIntent(
     wallet: WalletClient,
@@ -66,7 +80,8 @@ export async function commitIntent(
 export async function revealIntent(
     wallet: WalletClient,
     pulseAddress: Address,
-    input: RevealInput
+    input: RevealInput,
+    opts: {gas?: bigint} = {}
 ): Promise<Hex> {
     const data = encodeFunctionData({
         abi: PULSE_ABI,
@@ -81,7 +96,32 @@ export async function revealIntent(
         account,
         chain: wallet.chain,
         to: pulseAddress,
-        data
+        data,
+        gas: opts.gas ?? DEFAULT_REVEAL_GAS
+    });
+}
+
+export async function markExpiredIntent(
+    wallet: WalletClient,
+    pulseAddress: Address,
+    commitmentId: bigint,
+    opts: {gas?: bigint} = {}
+): Promise<Hex> {
+    const data = encodeFunctionData({
+        abi: PULSE_ABI,
+        functionName: "markExpired",
+        args: [commitmentId]
+    });
+
+    const account = wallet.account;
+    if (!account) throw new Error("wallet missing account");
+
+    return wallet.sendTransaction({
+        account,
+        chain: wallet.chain,
+        to: pulseAddress,
+        data,
+        gas: opts.gas ?? DEFAULT_MARK_EXPIRED_GAS
     });
 }
 

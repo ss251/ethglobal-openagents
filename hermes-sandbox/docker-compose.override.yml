@@ -13,6 +13,13 @@
 
 services:
   gateway:
+    # Mount the repo so Hermes's container can read pulse-skills sources and
+    # run our `bun run scripts/...` commands against the live Base Sepolia
+    # contracts. Without this, the skills can find SKILL.md (via ~/.hermes/skills/)
+    # but can't actually invoke the underlying scripts.
+    volumes:
+      - ../..:/workspace/ethglobal-openagents:rw
+
     # Force HERMES_UID/HERMES_GID to host user so files in ~/.hermes stay
     # readable on the host (matches upstream's intended workflow but makes it
     # explicit for our setup).
@@ -22,12 +29,12 @@ services:
 
     # Pass through Pulse contract addresses + Trading API key + the agent's
     # throwaway Sepolia key. Read from hermes-sandbox/.env (gitignored),
-    # NOT baked into the image. Required: false so the build doesn't fail
-    # when the file is missing — runtime tools that need these vars will
-    # fail at call time with a clear error instead.
+    # NOT baked into the image. Path is given as ../.env because we run
+    # `docker compose --project-directory upstream`, so relative paths
+    # resolve against `hermes-sandbox/upstream/`. ../  walks back up to
+    # `hermes-sandbox/` where the file lives.
     env_file:
-      - path: ./.env
-        required: false
+      - ../.env
 
     # Resource caps — Hermes's gateway can spawn subprocesses (MCP servers,
     # browsers, git, etc.). Bound them so a runaway prompt can't peg the host.

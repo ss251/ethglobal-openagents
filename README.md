@@ -2,6 +2,101 @@
 
 **Sealed Agent Commitments — extending the audit perimeter to the agent's reasoning.**
 
+> Agents commit their decisions before they execute them — sealed reasoning,
+> ERC-8004 reputation, and Uniswap v4 hook gating make drift slashable
+> and (at the v4 layer) physically impossible.
+
+[![Base Sepolia](https://img.shields.io/badge/deployed-Base%20Sepolia-blue?style=flat-square)](https://sepolia.basescan.org/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34)
+[![ERC-8004](https://img.shields.io/badge/ERC--8004-canonical-teal?style=flat-square)](https://github.com/erc-8004/erc-8004-contracts)
+[![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
+[![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
+[![Tests](https://img.shields.io/badge/forge%20test-17%2F17-brightgreen?style=flat-square)](#tests-17-passing)
+[![Release](https://img.shields.io/badge/release-v0.1.0-orange?style=flat-square)](#release-history)
+
+```mermaid
+flowchart TD
+    %% ── Off-chain agent runtime ────────────────────────────────────────
+    subgraph OFF["🛠 Off-chain — agent runtime · reasoning · market data"]
+        direction LR
+        Hermes["<b>Hermes container</b><br/>Nous Research<br/>Claude Max via OAuth"]
+        Skills["<b>pulse-skills bundle</b><br/>SKILL.md × 5"]
+        Agent(["<b>Agent EOA</b><br/>0x30cB…397c<br/>ERC-8004 #5263"])
+        ZG["<b>0G Compute</b><br/>TEE-attested qwen-2.5-7b<br/>provider 0xa48f…"]
+        Trade["<b>Uniswap Trading API</b><br/>/v1/quote · DUTCH_V2"]
+    end
+
+    %% ── On-chain Base Sepolia ──────────────────────────────────────────
+    subgraph BASE["⛓ Base Sepolia — chainId 84532"]
+        direction LR
+        subgraph ERC[" "]
+            direction TB
+            ID["<b>ERC-8004 IdentityRegistry</b><br/>0x8004A8…BD9e"]
+            Rep["<b>ERC-8004 ReputationRegistry</b><br/>0x8004B6…8713<br/>+100 / -1000 / -500"]
+        end
+        Pulse[["<b>Pulse.sol</b><br/>0xbe1b…BF34<br/>commit · reveal · markExpired"]]
+        subgraph V4["Uniswap v4 stack"]
+            direction TB
+            Hook["<b>PulseGatedHook</b><br/>0x137002…8080<br/>beforeSwap — atomic reveal"]
+            PM["<b>v4 PoolManager</b><br/>0x05E73…3408"]
+            Pool["<b>pUSD ↔ pWETH</b><br/>fee 0.3% · tickSpacing 60"]
+        end
+    end
+
+    Watcher{{"<b>Watcher</b> (off-chain)<br/>scripts/watch-and-slash.ts<br/>locks Violated after rollback"}}
+
+    %% ── Off-chain agent loop ───────────────────────────────────────────
+    Hermes -->|loads| Skills
+    Skills -->|instructs| Agent
+    Agent -->|prompt| ZG
+    ZG -.->|reasoning| Agent
+    Agent -->|quote req| Trade
+    Trade -.->|quote route| Agent
+
+    %% ── Cross-band: agent → Pulse ──────────────────────────────────────
+    Agent ==>|commit / reveal| Pulse
+    Pulse -->|isAuthorizedOrOwner| ID
+    Pulse ==>|giveFeedback| Rep
+    Hook -.->|getCommitment + reveal| Pulse
+
+    %% ── v4 swap path ──────────────────────────────────────────────────
+    Agent ==>|swap hookData| PM
+    PM -->|beforeSwap| Hook
+    PM -->|execute| Pool
+
+    %% ── Atomic-rollback recovery ──────────────────────────────────────
+    Pool -.->|failed swap| Watcher
+    Watcher ==>|reveal — lock Violated| Pulse
+
+    classDef agentBox fill:#e6fcf5,stroke:#5c940d,stroke-width:2px,color:#1e1e1e
+    classDef hermesBox fill:#e5dbff,stroke:#5f3dc4,stroke-width:2px,color:#1e1e1e
+    classDef skillsBox fill:#d0ebff,stroke:#1864ab,stroke-width:2px,color:#1e1e1e
+    classDef zgBox fill:#f3d9fa,stroke:#862e9c,stroke-width:2px,color:#1e1e1e
+    classDef tradeBox fill:#ffe3e3,stroke:#c92a2a,stroke-width:2px,color:#1e1e1e
+    classDef pulseBox fill:#99e9f2,stroke:#0b7285,stroke-width:3px,color:#1e1e1e
+    classDef ercBox fill:#e3fafc,stroke:#0b7285,stroke-width:2px,color:#1e1e1e
+    classDef v4Box fill:#bac8ff,stroke:#5f3dc4,stroke-width:2px,color:#1e1e1e
+    classDef watcherBox fill:#ffd8a8,stroke:#c92a2a,stroke-width:2px,color:#1e1e1e
+
+    class Agent agentBox
+    class Hermes hermesBox
+    class Skills skillsBox
+    class ZG zgBox
+    class Trade tradeBox
+    class Pulse pulseBox
+    class ID,Rep ercBox
+    class Hook,PM,Pool v4Box
+    class Watcher watcherBox
+```
+
+> **Quick start.** `forge build && forge test` for the contracts;
+> `bun run scripts/e2e-commit-reveal.ts` for the full commit / reveal /
+> violated / expired flow on Base Sepolia. Six end-to-end scripts under
+> [`scripts/`](scripts/) cover every load-bearing flow — see
+> [Live demos on Base Sepolia](#live-demos-on-base-sepolia).
+>
+> **Architecture rationale + threat-model trade-offs.** See
+> [`docs/adr/0001-audit-perimeter.md`](docs/adr/0001-audit-perimeter.md).
+
 On April 18, 2026, KelpDAO and Aave lost $292 million. The smart contracts
 were fine. No bug, no broken logic. The vulnerability was a single off-chain
 configuration decision — outside the perimeter every audit had ever covered.
@@ -217,6 +312,7 @@ honest table:
 | `signerProvider` is an EOA pretending to be a TEE | **Honestly disclosed.** The contract checks ECDSA recovery, not attestation. README, SPEC, and demo UI all explicitly label "stand-in vs production 0G enclave-born key." | |
 | Wash-trade reputation between same-owner agents | **Inherited ERC-8004 weakness.** | |
 | Honest-on-paper, malicious-in-practice business model | **Not defended.** Pulse certifies *consistency*, not *quality of intent.* | |
+| `eth_estimateGas` underbudgets close-tx (reveal/markExpired) gas | **SDK-mitigated.** `Pulse.reveal` and `markExpired` invoke `ReputationRegistry.giveFeedback` through a `try/catch`. RPCs estimate the OOG-success branch (catch swallows the inner OOG) and quote ~225k, but the inner storage writes need ~450k. The SDK ships explicit defaults (`DEFAULT_REVEAL_GAS = 600_000`, `DEFAULT_MARK_EXPIRED_GAS = 500_000`); custom integrators must override. | Discovered during e2e on Base Sepolia. |
 
 The `watch-and-slash.ts` watcher is the single most important post-deployment
 operational addition — it closes the atomic-reveal rollback gap without
@@ -230,6 +326,11 @@ contract changes.
 | --- | --- | --- |
 | **Pulse** | `0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34` | [Basescan](https://sepolia.basescan.org/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34) |
 | **PulseGatedHook** | `0x137002596a3a818B36d82490cF79B35c376e8080` | [Basescan](https://sepolia.basescan.org/address/0x137002596a3a818B36d82490cF79B35c376e8080) |
+| **Pulse Mock USD (`pUSD`)** | `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA` | [Basescan](https://sepolia.basescan.org/address/0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA) |
+| **Pulse Mock WETH (`pWETH`)** | `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349` | [Basescan](https://sepolia.basescan.org/address/0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349) |
+
+Pool: `pUSD ↔ pWETH`, fee `0.3%`, tickSpacing 60, initialized at 1:1 with a
+wide-range LP position via `script/Phase2.s.sol`.
 
 Hook permission flags = `0x0080` = `BEFORE_SWAP_FLAG` only (no NoOp surface,
 no `beforeSwapReturnDelta`). Mined via CREATE2 salt 57991.
@@ -238,9 +339,24 @@ Wires into:
 - ERC-8004 IdentityRegistry `0x8004A818BFB912233c491871b3d84c89A494BD9e`
 - ERC-8004 ReputationRegistry `0x8004B663056A597Dffe9eCcC1965A193B7388713`
 - Uniswap v4 PoolManager `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408`
+- 0G Compute provider `0xa48f01287233509FD694a22Bf840225062E67836` (qwen-2.5-7b-instruct, TEE-attested proxy)
 
 Full deployment record (constructor args, gas, dependencies) at
 [`deployments/base-sepolia.json`](deployments/base-sepolia.json).
+
+### Live demos on Base Sepolia
+
+Six end-to-end scripts exercise the deployed contracts; each prints tx
+hashes you can open in Basescan.
+
+| Script | What it proves |
+| --- | --- |
+| `bun run scripts/e2e-commit-reveal.ts` | All three commitment outcomes (`Revealed`, `Violated`, `Expired`) flip ERC-8004 reputation on chain via the deployed `ReputationRegistry`. |
+| `bun run scripts/exercise-gated-swap.ts` | The `PulseGatedHook` rejects naked swaps and admits Pulse-bound swaps that atomically reveal the commitment. |
+| `bun run scripts/violation-and-rollback-demo.ts` | The atomic-reveal rollback gap is real (status returns to Pending after the cheating-swap revert), and the off-chain watcher closes it by calling `Pulse.reveal` directly to lock in `Violated`. |
+| `bun run scripts/sealed-inference-demo.ts` | A 0G-attested qwen reasoning blob is hashed into `reasoningCID` and anchored on chain in a real Pulse commitment. |
+| `bun run scripts/phase8-tradingapi-demo.ts` | A live Uniswap Trading API quote (mainnet UniswapX DUTCH_V2, real liquidity) is normalized into `intentHash`+`reasoningCID` and committed on Base Sepolia. The commitment carries the quote's `requestId` so anyone can re-pull and verify. |
+| `bun run scripts/watch-and-slash.ts` | Long-running watcher service that does the rollback recovery automatically. |
 
 ### Tests: 17 passing
 
@@ -250,6 +366,75 @@ Full deployment record (constructor args, gas, dependencies) at
   commitment, mismatched intent, pre-window, post-deadline, malformed
   hookData, expired status, separate-mismatch-locks-Violated, double-spend
   edge case
+
+### Hermes integration
+
+The pulse-skills bundle is loaded into a sandboxed
+[NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
+container under `hermes-sandbox/`. The plumbing is verified end-to-end:
+
+| Layer | Status |
+| --- | --- |
+| Hermes container builds + starts | ✓ `./hermes-sandbox/up.sh` (image: `hermes-agent`, dashboard on :9119) |
+| All 5 pulse skills loaded as `local`/`enabled` | ✓ `hermes skills list` lists `pulse-commit`, `pulse-reveal`, `pulse-status-check`, `pulse-gated-swap`, `sealed-inference-with-pulse` |
+| Skill runtime (`bun` + viem + `.env`) inside container | ✓ `up.sh` installs `bun` post-start; `bun run scripts/exercise-gated-swap.ts` runs from inside the container against Base Sepolia |
+| Repo + `~/.hermes` bind-mounted into the container | ✓ `docker-compose.override.yml` mounts repo at `/workspace/ethglobal-openagents` |
+| Anthropic OAuth from Claude Code | ✓ `./auth.sh` reads the macOS Keychain entry `Claude Code-credentials` (filtered by `-a $USER` so it grabs the live entry, not a stale one from a prior install), drops the JSON at the doc-canonical path `~/.claude/.credentials.json` inside the container, and pins `model.provider: "anthropic"` in `config.yaml`. Hermes auto-seeds it into the Anthropic credential pool. |
+| Subscription routing (Pro/Max) | ✓ `auth.sh` also disables Hermes's heavyweight tool catalog (`web`, `browser`, `vision`, `image_gen`, `tts`, `session_search`, `clarify`, `delegation`, `cronjob`, `messaging`, `code_execution`, `memory`, `todo`) and empties `SOUL.md`. **Why:** Anthropic's Claude Pro/Max subscription quota is gated on per-request body size — a stock Hermes request with 27 tools (~35KB) gets billed via the "extra usage" pool and 402s with extra-usage off; a trimmed request (≤~23KB) routes to the subscription. Discovered by bisection on the live API. |
+| Live one-shot chat | ✓ `docker exec -it --user hermes hermes hermes -z "Reply with PONG" --provider anthropic -m claude-haiku-4-5` returns `PONG` cleanly. |
+| Pulse-bound prompt | ✓ Hermes was asked "query Pulse contract for commitment 16 status on Base Sepolia"; agent used `terminal` tool to run `cast call ... getStatus(uint256)`, parsed the result, and answered correctly: **Status Found: 0 = Pending — committed but not yet revealed**. |
+
+The wiring follows Hermes's `providers.md` recipe verbatim — Claude Code's
+credential store stays the single source of truth, no token copies into
+`~/.hermes/.env`, refresh stays automatic. To set this up:
+
+```bash
+./hermes-sandbox/up.sh        # build + start container
+./hermes-sandbox/auth.sh      # paste Claude Code OAuth from Keychain into Hermes
+```
+
+Then issue a pulse-bound prompt:
+
+```bash
+docker exec -it --user hermes hermes hermes \
+  -z "Use the pulse-commit skill to commit agent 5263 to selling 0.01 pETH for at least 1800 pUSD on Base Sepolia. Use a 30-second executeAfter and 10-minute reveal window." \
+  --provider anthropic -m claude-haiku-4-5
+```
+
+## Release history
+
+### v0.1.0 — ETHGlobal Open Agents 2026 submission *(2026-04-29)*
+
+Initial protocol drop. Tagged so graders can pin to a specific commit.
+
+- **Contracts deployed on Base Sepolia.** `Pulse.sol`
+  ([`0xbe1b…BF34`](https://sepolia.basescan.org/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34))
+  and `PulseGatedHook` ([`0x137002…8080`](https://sepolia.basescan.org/address/0x137002596a3a818B36d82490cF79B35c376e8080))
+  with mocks `pUSD` + `pWETH` and a wide-range LP position via `script/Phase2.s.sol`.
+- **Six live demos.** `e2e-commit-reveal`, `exercise-gated-swap`,
+  `violation-and-rollback-demo`, `sealed-inference-demo`, `phase8-tradingapi-demo`,
+  `watch-and-slash`. Each prints tx hashes you can open in Basescan.
+- **17 tests passing.** Pulse + PulseGatedHook with the real `Deployers` /
+  `HookTest` utilities from v4-core / uniswap-hooks.
+- **Hermes integration verified end-to-end.** Agent prompt → Pulse contract
+  read on Base Sepolia, billed against Claude Max OAuth subscription. See
+  [`hermes-sandbox/AUTH_NOTES.md`](hermes-sandbox/AUTH_NOTES.md) for the
+  two non-obvious blockers (stale Keychain entry, body-size gate) and
+  the fixes baked into `auth.sh`.
+- **0G sealed inference end-to-end.** qwen-2.5-7b-instruct reasoning
+  hashed into `reasoningCID` and anchored on chain via
+  `scripts/sealed-inference-demo.ts`.
+- **Architecture-decision-record.** [`docs/adr/0001-audit-perimeter.md`](docs/adr/0001-audit-perimeter.md)
+  captures the audit-perimeter thesis and the three load-bearing
+  trade-offs: atomic-rollback gap, Anthropic body-size gating, and
+  reveal-tx gas budgeting.
+
+### Pinned references
+
+The Excalidraw diagram source ([`ai/diagrams/pulse-architecture.excalidraw`](ai/diagrams/pulse-architecture.excalidraw))
+and a 2× rendered PNG ([`ai/diagrams/pulse-architecture.png`](ai/diagrams/pulse-architecture.png))
+are kept alongside the Mermaid block above as a drag-drop-editable
+backup for environments where Mermaid is unavailable.
 
 ## License
 

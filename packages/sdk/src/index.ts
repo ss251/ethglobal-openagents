@@ -1,4 +1,11 @@
-export {commitIntent, revealIntent, PULSE_ABI} from "./pulse.js";
+export {
+    commitIntent,
+    revealIntent,
+    markExpiredIntent,
+    PULSE_ABI,
+    DEFAULT_REVEAL_GAS,
+    DEFAULT_MARK_EXPIRED_GAS
+} from "./pulse.js";
 export {sealedReason, buildSealedPayload, fetchSealedReasoning, verifySealedReasoning} from "./zg.js";
 export {
     encodeSwapAction,
