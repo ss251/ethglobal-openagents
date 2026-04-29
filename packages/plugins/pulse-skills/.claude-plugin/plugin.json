@@ -1,6 +1,6 @@
 {
   "name": "pulse-skills",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Galaxy-brain-resistant agent commitments. Drop-in skills any agent (OpenClaw, Hermes, ElizaOS, Eliza, LangChain, custom) can use to commit-reveal onchain intents with sealed-inference reasoning, ERC-8004 reputation, and optional Uniswap v4 hook-gated execution.",
   "author": {
     "name": "Pulse",
@@ -29,6 +29,7 @@
     "./skills/pulse-gated-swap",
     "./skills/pulse-recover",
     "./skills/pulse-introspect",
+    "./skills/pulse-inft",
     "./skills/sealed-inference-with-pulse"
   ]
 }

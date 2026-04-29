@@ -39,6 +39,7 @@ Or via the Claude Code marketplace:
 | [pulse-gated-swap](./skills/pulse-gated-swap/SKILL.md)     | Execute a Uniswap v4 swap *through* a Pulse commitment — wrong intent → swap reverts.      |
 | [pulse-recover](./skills/pulse-recover/SKILL.md)           | Re-submit a gated swap when a previous run committed but the swap reverted (same intent, same nonce). |
 | [pulse-introspect](./skills/pulse-introspect/SKILL.md)     | Inspect recent agent-wallet activity or a single commitment without writing a block-scanner. |
+| [pulse-inft](./skills/pulse-inft/SKILL.md)                 | Mint or update an **ERC-7857 iNFT** on 0G that anchors the agent's encrypted state, ENS identity, ERC-8004 token id, Pulse contract, and recent commitments into one transferable NFT. |
 | [sealed-inference-with-pulse](./skills/sealed-inference-with-pulse/SKILL.md) | Pull TEE-signed reasoning from 0G Compute (or any EIP-191 signer) and bind it to commit.   |
 
 The skills compose. A typical autonomous-agent flow is:

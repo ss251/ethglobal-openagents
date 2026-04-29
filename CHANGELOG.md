@@ -9,6 +9,79 @@ GitHub Releases mirror this file; see
 <https://github.com/ss251/ethglobal-openagents/releases> for downloadable
 archives at each tag.
 
+## [0.4.0] — 2026-04-29 — ERC-7857 iNFT on 0G + prize-track full coverage
+
+The agent's identity is now an iNFT. `pulseagent.eth` is minted as
+`PulseAgentINFT(tokenId=1)` on 0G Galileo testnet (chainId 16602) at
+`0x180D8105dc415553e338BDB06251e8aC3e48227C`. The iNFT anchors the agent's
+encrypted state, ENS namehash, ERC-8004 token id (3906), Pulse contract
+address, and the full 10-commitment history the agent has made on Eth
+Sepolia (#9, #12, #13, #14, #15, #21, #23, #24, #25, #26). Transfer or
+clone the iNFT and the new owner inherits the rep trail — every Pulse
+commit becomes part of a transferable, encrypted ledger.
+
+Built specifically for the 0G "Best Autonomous Agents, Swarms & iNFT
+Innovations" prize track ($7,500), which explicitly names ERC-7857 as
+the integration target.
+
+### Added
+
+- **`contracts/inft/PulseAgentINFT.sol`** — single-file ERC-7857
+  implementation. Inherits OpenZeppelin `ERC721 + Ownable`, implements
+  `IERC7857`, `IERC7857Metadata`, and `IERC7857DataVerifier`. Self-verifier
+  pattern (the contract is its own verifier) saves an extra deploy. ECDSA
+  proof gates mint/update/transfer/clone — same trust anchor as Pulse's
+  `signerProvider`.
+- **Pulse-specific extensions on the iNFT**:
+  - `bindPulseAgent(tokenId, agentId, ensNode, pulse, pulseChainId)` —
+    cross-chain link from iNFT to Pulse identity stack.
+  - `recordCommitment(tokenId, commitmentId, pulseChainId)` —
+    append-only commitment history per iNFT.
+  - `commitmentsOf(tokenId)` view + clone-inheritance so a new owner
+    inherits the full Pulse trail.
+- **`contracts/inft/IERC7857.sol`, `IERC7857Metadata.sol`, `IERC7857DataVerifier.sol`** —
+  vendored verbatim from `0glabs/0g-agent-nft@eip-7857-draft` so
+  PulseAgentINFT is interchangeable with any other ERC-7857 implementation.
+- **`script/DeployINFT.s.sol`** — Foundry deploy script for 0G Galileo.
+  Requires `--legacy --skip-simulation` (Galileo doesn't accept EIP-1559 fee
+  fields and the testnet RPC rejects parallel `eth_call` + `sendRawTx`).
+- **`scripts/inft-bind.ts`** + `pulse-inft` skill — orchestrator that
+  encrypts the agent state blob with AES-256-GCM, hashes the ciphertext,
+  builds an ECDSA preimage proof, mints, binds Pulse, records commitments,
+  and (optionally) writes the ENS text record `0g.inft` on Sepolia. Single
+  JSON object on stdout with all tx hashes.
+- **`scripts/_lib/zg.ts`** — viem chain definition for 0G Galileo (chainId
+  16602, RPC `https://evmrpc-testnet.0g.ai`, faucet, indexer URL).
+- **ENS text record `0g.inft`** at `pulseagent.eth` →
+  `0g-galileo:16602:0x180D8105dc415553e338BDB06251e8aC3e48227C:1`. Existing
+  `pulseProvenanceFromENS()` readers can discover the iNFT from the
+  agent's name without hardcoding addresses.
+- **`test/PulseAgentINFT.t.sol`** — 10 forge tests covering the ERC-7857
+  surface + the Pulse-specific extensions. All real signatures via
+  `vm.sign`, no mocks beyond the signer keypair.
+
+### Changed
+
+- **`FEEDBACK.md` rewritten** with concrete findings from the build
+  (Uniswap track requirement). All "TBD" sections replaced with specific
+  feedback grounded in real tx hashes — what worked, where I lost time
+  (5 specific friction points + suggestions), what I wish existed for
+  agent-first builders.
+- `pulse-skills` plugin/marketplace metadata bumped 0.3.0 → 0.4.0; skills
+  array now lists 9 entries (added `pulse-inft`).
+- `SOUL.md` references the new `pulse-inft` skill + `inft-bind.ts`
+  helper script.
+- README badge: forge test count 17 → 27, release v0.3.0 → v0.4.0,
+  added ERC-7857 prize-track shield.
+
+### Verified live (all on chain, all from today)
+
+- Mint tx (0G Galileo): `0x6250a98822f42fa8a6f266bef0fdd83d475ebce45abd8dddcda8c456ad54afcc`
+- bindPulseAgent tx: `0x5bd9de34c674ba8c6f2c1d36808ccf5b4d9859d11591b77f6df77736394e0b6a`
+- 10 recordCommitment txs (one per Pulse commitment in the agent's history).
+- ENS `setText 0g.inft` tx (Eth Sepolia): `0x727e7f3242161f0a8e0517fb57413ad16077135250eca5781bfa1fada9f313d1`
+- All 27 forge tests pass (17 legacy + 10 new iNFT).
+
 ## [0.3.0] — 2026-04-29 — Integrator pass
 
 Born out of the un-coached Telegram test. With no skill name in the prompt,
@@ -220,6 +293,7 @@ Initial protocol drop. Tagged so graders can pin to a specific commit.
   trade-offs: atomic-rollback gap, Anthropic body-size gating, and
   reveal-tx gas budgeting.
 
+[0.4.0]: https://github.com/ss251/ethglobal-openagents/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ss251/ethglobal-openagents/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ss251/ethglobal-openagents/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/ss251/ethglobal-openagents/compare/v0.1.4...v0.1.5

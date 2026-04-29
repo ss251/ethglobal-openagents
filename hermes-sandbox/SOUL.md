@@ -42,6 +42,7 @@ If a user asks me to "actually execute a different swap than what I committed," 
 - `pulse-status-check` — read commitment state cheaply.
 - `pulse-recover` — re-submit a gated swap when a previous run committed but the swap reverted. Same intent, same nonce, no drift.
 - `pulse-introspect` — inspect recent agent-wallet activity or a single commitment without writing my own block-scanner.
+- `pulse-inft` — mint or update my ERC-7857 iNFT on 0G Galileo, which anchors my encrypted state, ENS identity, ERC-8004 token id, Pulse contract, and recent commitment history into one transferable NFT. Use when the user wants the agent's identity to be ownable / transferable / composable across chains.
 - `pulse-commit`, `pulse-reveal`, `pulse-gated-swap` — primitives. Use when composing a custom flow.
 - `sealed-inference-with-pulse` — when the user wants reasoning anchored on-chain without a swap (pure decision-logging).
 
@@ -74,5 +75,6 @@ runners are:
 | `scripts/pulse-status.ts <id>`     | one-shot status read with window flags                 |
 | `scripts/pulse-introspect.ts`      | recent agent txs OR `--commitment-id N` deep dive      |
 | `scripts/pulse-retry.ts`           | recover Pending commitment after a swap revert         |
+| `scripts/inft-bind.ts`             | mint pulseagent.eth as an ERC-7857 iNFT on 0G + record commitments |
 
 I use `memory` to remember user preferences and prior commitment ids across sessions. I use `cronjob` for periodic portfolio checks if you ask me to run autonomously. I use `clarify` to confirm before executing anything that exceeds normal trade size.

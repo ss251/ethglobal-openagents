@@ -10,8 +10,9 @@
 [![ERC-8004](https://img.shields.io/badge/ERC--8004-canonical-teal?style=flat-square)](https://github.com/erc-8004/erc-8004-contracts)
 [![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
 [![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
-[![Tests](https://img.shields.io/badge/forge%20test-17%2F17-brightgreen?style=flat-square)](#tests-17-passing)
-[![Release](https://img.shields.io/badge/release-v0.3.0-orange?style=flat-square)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/forge%20test-27%2F27-brightgreen?style=flat-square)](#tests-27-passing)
+[![Release](https://img.shields.io/badge/release-v0.4.0-orange?style=flat-square)](CHANGELOG.md)
+[![ERC-7857](https://img.shields.io/badge/ERC--7857-iNFT%20on%200G-purple?style=flat-square)](https://chainscan-galileo.0g.ai/address/0x180D8105dc415553e338BDB06251e8aC3e48227C)
 [![Hermes](https://img.shields.io/badge/Hermes-Telegram%20gateway-7d5fff?style=flat-square)](https://hermes-agent.nousresearch.com/)
 [![ENS](https://img.shields.io/badge/ENS-pulseagent.eth-5298ff?style=flat-square)](https://sepolia.app.ens.domains/pulseagent.eth)
 
@@ -316,6 +317,7 @@ npx skills add ss251/ethglobal-openagents
 | `pulse-gated-swap`             | Execute a Uniswap v4 swap *through* a Pulse commitment — wrong intent doesn't just slash, it reverts.    |
 | `pulse-recover`                | Re-submit a gated swap when a previous run committed but the swap reverted. Same intent, same nonce.     |
 | `pulse-introspect`             | Inspect recent agent-wallet activity or a single commitment without writing a block-scanner.             |
+| `pulse-inft`                   | Mint or update an **ERC-7857 iNFT** on 0G that anchors the agent's encrypted state + ENS + ERC-8004 + commitment history into one transferable NFT. |
 | `sealed-inference-with-pulse`  | Pull TEE-signed reasoning (0G Compute or any EIP-191 signer) and bind it to commit.                      |
 
 Framework adapter recipes for OpenClaw, Hermes, ElizaOS, LangChain,
@@ -338,6 +340,7 @@ The script surface is the public contract:
 | `scripts/pulse-status.ts <id>`            | `pulse-status-check`        | One-shot status read with window flags                 |
 | `scripts/pulse-introspect.ts`             | `pulse-introspect`          | Recent agent txs OR `--commitment-id N` deep dive      |
 | `scripts/pulse-retry.ts`                  | `pulse-recover`             | Recover Pending commitment after a swap revert         |
+| `scripts/inft-bind.ts`                    | `pulse-inft`                | Mint pulseagent.eth as an ERC-7857 iNFT on 0G + bind   |
 
 All scripts share `scripts/_lib/` (env loader, ABIs, direction-aware funding,
 Pulse helpers, BigInt-safe JSON output) so behavior is consistent across them.
@@ -422,6 +425,20 @@ Wires into:
 - ERC-8004 ReputationRegistry `0x8004B663056A597Dffe9eCcC1965A193B7388713`
 - Uniswap v4 PoolManager `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`
 - 0G Compute provider `0xa48f01287233509FD694a22Bf840225062E67836` (qwen-2.5-7b-instruct, TEE-attested proxy)
+- 0G Galileo (chainId 16602) — `PulseAgentINFT` (ERC-7857) at `0x180D8105dc415553e338BDB06251e8aC3e48227C`. tokenId 1 holds `pulseagent.eth`'s encrypted state + 10-commitment history. ENS text record `0g.inft = 0g-galileo:16602:0x180D8105…:1` resolves the iNFT from the agent's name.
+
+### Deployed on 0G Galileo (chainId 16602)
+
+| Contract | Address | Explorer |
+| --- | --- | --- |
+| **PulseAgentINFT** (ERC-7857 iNFT) | `0x180D8105dc415553e338BDB06251e8aC3e48227C` | [Chainscan](https://chainscan-galileo.0g.ai/address/0x180D8105dc415553e338BDB06251e8aC3e48227C) |
+
+The iNFT carries the agent's encrypted state blob hash (AES-256-GCM
+ciphertext anchor), the Pulse identity binding (ERC-8004 token id 3906,
+namehash of `pulseagent.eth`, Pulse contract address, chainId 11155111),
+and an append-only history of Pulse commitment IDs the agent has
+made. Transfer or clone the iNFT and the new owner inherits the full rep
+trail — drift is provable across owners.
 
 **Agent identity (ENS).** [`pulseagent.eth`](https://sepolia.app.ens.domains/pulseagent.eth)
 on Sepolia ENS is the human-readable handle for the agent. Five text records
@@ -450,14 +467,18 @@ hashes you can open in Etherscan.
 | `bun run scripts/ens-bind-demo.ts` | Binds 5 text records on `pulseagent.eth`, resolves them back via `pulseProvenanceFromENS()`, then submits a `Pulse.commit` whose `agentId` and `signerProvider` come *only* from ENS — proves ENS does real work in the agent identity stack. |
 | `bun run scripts/watch-and-slash.ts` | Long-running watcher service that does the rollback recovery automatically. |
 
-### Tests: 17 passing
+### Tests: 27 passing
 
-- Pulse: commit, reveal-match, reveal-mismatch, reveal-too-early, expire,
-  wrong-signer, non-owner reverts
-- PulseGatedHook: atomic-reveal swap, separate-reveal swap, missing
+- **Pulse (6)**: commit, reveal-match, reveal-mismatch, reveal-too-early,
+  expire, wrong-signer, non-owner reverts.
+- **PulseGatedHook (11)**: atomic-reveal swap, separate-reveal swap, missing
   commitment, mismatched intent, pre-window, post-deadline, malformed
   hookData, expired status, separate-mismatch-locks-Violated, double-spend
-  edge case
+  edge case.
+- **PulseAgentINFT (10)**: ERC-7857 mint flow, signature-rejection, Pulse
+  binding, commitment-history append + clone-inheritance, authorize-usage,
+  transfer with valid proof, signer-rotation owner-gate, ERC-165
+  interfaces.
 
 ### Hermes integration — autonomous Pulse-bound trading agent in Telegram
 
@@ -561,7 +582,7 @@ Release notes live in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog
 format). Tagged releases with downloadable archives are mirrored to
 [GitHub Releases](https://github.com/ss251/ethglobal-openagents/releases).
 
-Latest: [v0.3.0 — Integrator pass](CHANGELOG.md#030--2026-04-29--integrator-pass).
+Latest: [v0.4.0 — ERC-7857 iNFT on 0G + prize-track full coverage](CHANGELOG.md#040--2026-04-29--erc-7857-inft-on-0g--prize-track-full-coverage).
 
 ## License
 
