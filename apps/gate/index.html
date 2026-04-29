@@ -3,131 +3,382 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Pulse Gate — reference reputation gate for onchain agents</title>
-<meta name="description" content="The reference consumer of Pulse reputation. Paste an ERC-8004 agent id and see whether they pass the Pulse-tagged feedback threshold." />
+<title>PULSE / GATE — agent reputation oscilloscope</title>
+<meta name="description" content="The reference reader of Pulse reputation. Paste an ERC-8004 agent id and trace their on-chain pulse." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+
 <style>
+  /* ─── reset / vars ────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0a0a0a;
-    --fg: #f5f5f5;
-    --muted: #888;
-    --border: #1f1f1f;
-    --card: #111;
-    --green: #1aa860;
-    --green-bg: #0c2e1c;
-    --red: #d74545;
-    --red-bg: #2e1010;
-    --accent: #6b8eff;
+    --bg: #050505;
+    --paper: #f0e8d8;          /* warm CRT white */
+    --ink: #d8d2c2;
+    --dim: #76705f;
+    --rule: #1a1a18;
+
+    --phosphor: #00FF6B;
+    --phosphor-bg: #022a13;
+    --phosphor-glow: 0 0 8px rgba(0,255,107,0.35), 0 0 24px rgba(0,255,107,0.12);
+
+    --magenta: #FF005C;         /* the live trace */
+    --magenta-glow: 0 0 12px rgba(255,0,92,0.4);
+
+    --alert: #FF1A1A;
+    --alert-bg: #2a0606;
+    --alert-glow: 0 0 8px rgba(255,26,26,0.4);
+
+    --amber: #FFB800;
+    --amber-bg: #2a1d00;
+
+    --panel-border: rgba(240,232,216,0.12);
+    --panel-border-strong: rgba(240,232,216,0.28);
+
+    --display: "Major Mono Display", monospace;
+    --mono: "DM Mono", "JetBrains Mono", ui-monospace, monospace;
   }
-  * { box-sizing: border-box; }
+
+  html, body { background: var(--bg); color: var(--paper); min-height: 100vh; }
+
   body {
-    margin: 0;
-    font: 15px/1.55 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
-    background: var(--bg);
-    color: var(--fg);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 60px 20px;
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.55;
+    letter-spacing: 0.01em;
+    overflow-x: hidden;
+    position: relative;
   }
-  .wrap { max-width: 760px; width: 100%; }
-  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
-  .lede { color: var(--muted); margin: 0 0 28px; }
-  .lede a { color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent); }
-  form { display: flex; gap: 8px; margin-bottom: 24px; }
+
+  /* phosphor grid */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,107,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,107,0.04) 1px, transparent 1px);
+    background-size: 56px 56px;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, black, transparent);
+  }
+  /* film grain */
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.04;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: overlay;
+  }
+
+  main {
+    position: relative; z-index: 2;
+    max-width: 920px; margin: 0 auto;
+    padding: 28px 28px 100px;
+  }
+
+  /* ─── status bar ───────────────────────────────────────────────────── */
+  .bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 14px; margin-bottom: 64px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--dim);
+  }
+  .bar .left, .bar .right { display: flex; gap: 18px; align-items: center; }
+  .bar .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--phosphor);
+    box-shadow: var(--phosphor-glow);
+    animation: heartbeat 1.4s ease-in-out infinite;
+  }
+  @keyframes heartbeat {
+    0%, 70%, 100% { opacity: 1; transform: scale(1); }
+    14% { opacity: 1; transform: scale(1.6); }
+    28% { opacity: 0.4; transform: scale(0.9); }
+    42% { opacity: 1; transform: scale(1.4); }
+  }
+
+  /* ─── hero ─────────────────────────────────────────────────────────── */
+  .wordmark {
+    font-family: var(--display);
+    font-size: clamp(72px, 14vw, 168px);
+    line-height: 0.86;
+    letter-spacing: -0.02em;
+    color: var(--paper);
+    margin: 16px 0 4px;
+    text-shadow: 0 0 24px rgba(255,0,92,0.06), 0 0 60px rgba(0,255,107,0.04);
+  }
+  .wordmark .slash { color: var(--magenta); text-shadow: var(--magenta-glow); }
+  .wordmark .word { color: var(--ink); opacity: 0.85; }
+
+  .lede {
+    font-size: 14px; max-width: 56ch; color: var(--ink);
+    margin: 14px 0 8px;
+  }
+  .lede a, .meta a { color: var(--magenta); text-decoration: none; border-bottom: 1px dashed rgba(255,0,92,0.4); }
+  .lede a:hover, .meta a:hover { background: rgba(255,0,92,0.08); }
+  .lede code, .meta code, code {
+    font-family: var(--mono); font-weight: 500; font-size: 0.9em;
+    padding: 1px 6px; background: rgba(0,255,107,0.06); border: 1px solid rgba(0,255,107,0.12);
+    color: var(--phosphor);
+  }
+
+  /* ─── input panel ──────────────────────────────────────────────────── */
+  .console {
+    margin: 56px 0 24px;
+    border: 1px solid var(--panel-border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.012), transparent);
+    padding: 28px 28px 24px;
+    position: relative;
+  }
+  .console-label {
+    position: absolute; top: -10px; left: 18px;
+    background: var(--bg); padding: 0 10px;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--dim);
+  }
+  form { display: flex; gap: 12px; }
+  .prompt {
+    color: var(--magenta);
+    text-shadow: var(--magenta-glow);
+    font-weight: 500; font-size: 18px;
+    padding-top: 10px;
+  }
+  .prompt::after {
+    content: "▮"; margin-left: 6px;
+    animation: blink 1.05s steps(1, end) infinite;
+    color: var(--magenta);
+  }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
   input {
-    flex: 1;
-    background: var(--card);
-    border: 1px solid var(--border);
-    color: var(--fg);
-    padding: 14px 16px;
-    border-radius: 10px;
-    font: inherit;
-    outline: none;
+    flex: 1; background: transparent; border: 0; border-bottom: 1px solid var(--panel-border);
+    color: var(--paper); font-family: var(--mono); font-size: 17px;
+    padding: 8px 0; outline: none; letter-spacing: 0.04em;
   }
-  input:focus { border-color: var(--accent); }
+  input:focus { border-color: var(--magenta); }
+  input::placeholder { color: var(--dim); letter-spacing: 0.08em; }
   button {
-    background: var(--fg);
-    color: var(--bg);
-    border: 0;
-    padding: 0 20px;
-    border-radius: 10px;
-    font: inherit;
-    font-weight: 600;
+    background: var(--paper); color: var(--bg);
+    border: 0; padding: 0 22px; font-family: var(--mono); font-weight: 500;
+    font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
     cursor: pointer;
+    transition: background 0.18s, color 0.18s, transform 0.06s;
   }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .banner {
-    padding: 28px 24px;
-    border-radius: 16px;
-    text-align: left;
-    margin-bottom: 16px;
+  button:hover { background: var(--magenta); color: var(--paper); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.45; cursor: progress; }
+  button:disabled:hover { background: var(--paper); color: var(--bg); }
+
+  /* ─── result oscilloscope ─────────────────────────────────────────── */
+  .scope {
+    margin-top: 32px; padding: 0;
+    border: 1px solid var(--panel-border-strong);
+    position: relative;
+    background: linear-gradient(180deg, #050707 0%, #030303 100%);
+    overflow: hidden;
+  }
+  .scope.approved { border-color: rgba(0,255,107,0.38); box-shadow: 0 0 0 1px rgba(0,255,107,0.06), inset 0 0 60px rgba(0,255,107,0.04); }
+  .scope.rejected { border-color: rgba(255,26,26,0.42); box-shadow: 0 0 0 1px rgba(255,26,26,0.06), inset 0 0 60px rgba(255,26,26,0.05); }
+  .scope.untracked { border-color: rgba(255,184,0,0.34); box-shadow: 0 0 0 1px rgba(255,184,0,0.05), inset 0 0 60px rgba(255,184,0,0.04); }
+
+  .scope-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 22px; border-bottom: 1px dashed var(--rule);
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
+  }
+  .scope-head .agent { color: var(--paper); }
+  .verdict-line {
+    padding: 28px 22px 14px;
+  }
+  .verdict {
+    font-family: var(--display);
+    font-size: clamp(28px, 5vw, 44px);
+    line-height: 1; letter-spacing: -0.01em;
+  }
+  .approved .verdict { color: var(--phosphor); text-shadow: var(--phosphor-glow); }
+  .rejected .verdict { color: var(--alert); text-shadow: var(--alert-glow); }
+  .untracked .verdict { color: var(--amber); }
+  .sub {
+    margin-top: 8px; font-size: 12px; color: var(--ink); letter-spacing: 0.04em;
+  }
+
+  /* waveform bay */
+  .wave-wrap {
+    padding: 18px 22px 8px;
+    position: relative;
+  }
+  .wave-wrap .axis-label {
+    position: absolute; right: 22px; top: 22px;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
+  }
+  svg.wave { width: 100%; height: 140px; display: block; }
+  svg.wave .grid { stroke: rgba(240,232,216,0.05); stroke-width: 1; }
+  svg.wave .gridmid { stroke: rgba(240,232,216,0.12); stroke-width: 1; stroke-dasharray: 2 4; }
+  svg.wave .trace { fill: none; stroke: var(--magenta); stroke-width: 1.5; filter: drop-shadow(0 0 5px rgba(255,0,92,0.7)); }
+  .approved svg.wave .trace { stroke: var(--phosphor); filter: drop-shadow(0 0 6px rgba(0,255,107,0.7)); }
+  .rejected svg.wave .trace { stroke: var(--alert); filter: drop-shadow(0 0 6px rgba(255,26,26,0.7)); }
+  .untracked svg.wave .trace { stroke: var(--amber); filter: drop-shadow(0 0 4px rgba(255,184,0,0.5)); }
+
+  /* stats grid */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    border-top: 1px dashed var(--rule);
+  }
+  .stats .cell {
+    padding: 18px 22px; border-right: 1px dashed var(--rule);
+  }
+  .stats .cell:last-child { border-right: 0; }
+  .stats dt { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; }
+  .stats dd { font-family: var(--display); font-size: 24px; color: var(--paper); }
+  .stats .pos { color: var(--phosphor); }
+  .stats .neg { color: var(--alert); }
+
+  /* timeline */
+  .timeline-wrap { padding: 22px 22px 26px; border-top: 1px dashed var(--rule); }
+  .timeline-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
+    margin-bottom: 14px;
+  }
+  .timeline-head .count { color: var(--paper); }
+  .timeline {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 90px 90px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    font-size: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(240,232,216,0.04);
+    color: var(--ink);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row .badge {
+    display: inline-block; padding: 2px 8px;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
     border: 1px solid;
   }
-  .banner.approved { background: var(--green-bg); border-color: var(--green); }
-  .banner.rejected { background: var(--red-bg); border-color: var(--red); }
-  .banner.untracked { background: #181818; border-color: var(--border); }
-  .verdict { font-size: 22px; font-weight: 600; }
-  .approved .verdict { color: var(--green); }
-  .rejected .verdict { color: var(--red); }
-  .untracked .verdict { color: var(--muted); }
-  dl { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; margin: 16px 0 0; }
-  dt { color: var(--muted); }
-  dd { margin: 0; word-break: break-all; }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    padding: 18px 20px;
-    border-radius: 12px;
-    margin-top: 12px;
+  .row .badge.kept { color: var(--phosphor); border-color: rgba(0,255,107,0.4); background: rgba(0,255,107,0.06); }
+  .row .badge.violated { color: var(--alert); border-color: rgba(255,26,26,0.45); background: rgba(255,26,26,0.06); }
+  .row .badge.expired { color: var(--amber); border-color: rgba(255,184,0,0.4); background: rgba(255,184,0,0.06); }
+  .row .badge.committed { color: var(--ink); border-color: rgba(240,232,216,0.2); }
+  .row .id { color: var(--dim); font-feature-settings: "tnum"; }
+  .row .ts { color: var(--ink); }
+  .row .tx a { color: var(--dim); text-decoration: none; }
+  .row .tx a:hover { color: var(--magenta); }
+  .timeline .empty {
+    padding: 24px 0; text-align: center; color: var(--dim);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    border-top: 1px dashed var(--rule);
+    border-bottom: 1px dashed var(--rule);
   }
-  .card h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
-  .links a { color: var(--accent); text-decoration: none; margin-right: 16px; }
-  .links a:hover { text-decoration: underline; }
-  .status { color: var(--muted); margin-top: 16px; font-size: 13px; }
-  .err { color: var(--red); margin-top: 12px; font-size: 13px; }
-  footer { margin-top: 60px; color: var(--muted); font-size: 12px; }
-  footer a { color: var(--muted); }
-  code { background: #161616; padding: 1px 6px; border-radius: 4px; }
+
+  /* meta footer */
+  .meta {
+    margin-top: 16px; padding: 14px 22px;
+    border-top: 1px dashed var(--rule);
+    display: flex; flex-wrap: wrap; gap: 24px;
+    font-size: 11px; letter-spacing: 0.04em; color: var(--dim);
+  }
+  .meta a { font-weight: 500; }
+
+  .err, .status-msg {
+    margin-top: 14px;
+    padding: 12px 16px;
+    font-size: 12px; letter-spacing: 0.04em;
+  }
+  .err { color: var(--alert); border: 1px solid rgba(255,26,26,0.3); background: var(--alert-bg); }
+  .status-msg { color: var(--dim); }
+  .status-msg::before { content: "▸ "; color: var(--magenta); }
+
+  /* footer */
+  footer {
+    position: relative; z-index: 2;
+    max-width: 920px; margin: 0 auto;
+    padding: 30px 28px 60px;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--dim);
+    display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between;
+    border-top: 1px solid var(--rule);
+  }
+  footer a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); }
+  footer a:hover { color: var(--magenta); border-color: var(--magenta); }
+
+  @media (max-width: 720px) {
+    main { padding: 20px 18px 80px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stats .cell:nth-child(2) { border-right: 0; }
+    .row { grid-template-columns: 80px 1fr auto; gap: 10px; }
+    .row .id { display: none; }
+    form { flex-direction: column; }
+    button { padding: 14px 0; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Pulse Gate</h1>
+<main>
+  <div class="bar">
+    <div class="left"><span class="dot" aria-hidden="true"></span> PULSE / GATE</div>
+    <div class="right">
+      <span>v0.7.0</span>
+      <span>SEPOLIA · 11155111</span>
+    </div>
+  </div>
+
+  <h1 class="wordmark"><span class="word">PULSE</span><span class="slash">/</span><span class="word">GATE</span></h1>
+
   <p class="lede">
-    Reference consumer of Pulse reputation. Reads <a href="https://github.com/erc-8004/erc-8004-contracts" target="_blank" rel="noopener">ERC-8004</a>
-    feedback tagged <code>"pulse"</code> via the canonical
-    <code>getSummary</code>. Threshold-gated. Any protocol can clone this in an afternoon.
+    Reference reader of <a href="https://github.com/erc-8004/erc-8004-contracts" target="_blank" rel="noopener">ERC-8004</a> reputation
+    filtered by <code>tag1="pulse"</code>. Reads the canonical <code>getSummary</code>, applies a threshold,
+    surfaces the agent's commitment trail. Two lines for any protocol to compose with.
   </p>
 
-  <form id="f">
-    <input id="agentId" type="text" inputmode="numeric" placeholder="ERC-8004 agent id (e.g. 3906)" autofocus />
-    <button id="check" type="submit">Check Gate</button>
-  </form>
+  <section class="console">
+    <span class="console-label">▸ probe</span>
+    <form id="f">
+      <span class="prompt">id</span>
+      <input id="agentId" type="text" inputmode="numeric" placeholder="erc-8004 agent id  (e.g. 3906)" autocomplete="off" autofocus />
+      <button id="check" type="submit">Trace</button>
+    </form>
+    <div id="status" class="status-msg" hidden></div>
+    <div id="err" class="err" hidden></div>
+  </section>
 
-  <div id="result" hidden></div>
-  <div id="status" class="status"></div>
-  <div id="err" class="err"></div>
+  <section id="result" hidden></section>
+</main>
 
-  <footer>
-    Pulse — sealed agent commitments.
+<footer>
+  <div>Pulse — sealed agent commitments</div>
+  <div>
     <a href="https://github.com/ss251/ethglobal-openagents" target="_blank" rel="noopener">github</a> ·
-    <a href="https://sepolia.app.ens.domains/pulseagent.eth" target="_blank" rel="noopener">pulseagent.eth</a>
-  </footer>
-</div>
+    <a href="https://sepolia.app.ens.domains/pulseagent.eth" target="_blank" rel="noopener">pulseagent.eth</a> ·
+    <a href="https://8004scan.io" target="_blank" rel="noopener">8004scan</a>
+  </div>
+</footer>
 
 <script type="module">
-import { createPublicClient, http, parseAbi } from "https://esm.sh/viem@2.48.4";
+import { createPublicClient, http, parseAbi, parseEventLogs, parseAbiItem } from "https://esm.sh/viem@2.48.4";
 import { sepolia } from "https://esm.sh/viem@2.48.4/chains";
 
-// ─── Deploy targets ────────────────────────────────────────────────────
-// Eth Sepolia. Override via URL params: ?gate=0x...&pulse=0x...&threshold=50
+// ─── deploy targets (override via URL) ─────────────────────────────────
 const params = new URLSearchParams(location.search);
-const REPUTATION = "0x8004B663056A597Dffe9eCcC1965A193B7388713"; // canonical ERC-8004 ReputationRegistry
+const REPUTATION = "0x8004B663056A597Dffe9eCcC1965A193B7388713";
 const PULSE = params.get("pulse") || "0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34";
-const GATE = params.get("gate") || "0x4d11e22268b8512B01dA7182a52Ba040A0709379"; // deployed PulseGatedGate on Eth Sepolia (v0.7.0)
+const GATE = params.get("gate") || "0x4d11e22268b8512B01dA7182a52Ba040A0709379";
 const DEFAULT_THRESHOLD = BigInt(params.get("threshold") || "50");
 const RPC = params.get("rpc") || "https://ethereum-sepolia-rpc.publicnode.com";
+// PublicNode Sepolia caps eth_getLogs at 50_000 blocks per request, so we
+// chunk the lookback into LOG_CHUNK-sized windows walking backward from head.
+const LOG_CHUNK = BigInt(params.get("chunk") || "49000"); // stay under cap
+const LOG_CHUNKS = Number(params.get("chunks") || "5");   // ~245k blocks total ≈ 34 days
+const LOG_TARGET = Number(params.get("limit") || "6");    // stop once we have N final events
 
 const REGISTRY_ABI = parseAbi([
   "function getSummary(uint256 agentId, address[] clientAddresses, string tag1, string tag2) view returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals)",
@@ -138,88 +389,293 @@ const GATE_ABI = parseAbi([
   "function tag2Filter() view returns (string)",
 ]);
 
+// Pulse event signatures — decoded against the deployed Pulse.sol
+const PULSE_EVENTS = {
+  Committed: parseAbiItem("event Committed(uint256 indexed id, uint256 indexed agentId, bytes32 intentHash, bytes32 reasoningCID, uint64 executeAfter, uint64 revealDeadline, address signerProvider)"),
+  Revealed: parseAbiItem("event Revealed(uint256 indexed id, uint256 indexed agentId, bytes actionData)"),
+  Violated: parseAbiItem("event Violated(uint256 indexed id, uint256 indexed agentId, bytes32 computedHash)"),
+  Expired: parseAbiItem("event Expired(uint256 indexed id, uint256 indexed agentId)"),
+};
+
 const client = createPublicClient({ chain: sepolia, transport: http(RPC) });
 
+// ─── DOM ────────────────────────────────────────────────────────────────
 const $f = document.getElementById("f");
-const $agentId = document.getElementById("agentId");
+const $agent = document.getElementById("agentId");
+const $btn = document.getElementById("check");
 const $result = document.getElementById("result");
 const $status = document.getElementById("status");
 const $err = document.getElementById("err");
-const $btn = document.getElementById("check");
 
-// Pre-fill from URL
-if (params.get("agent")) $agentId.value = params.get("agent");
+if (params.get("agent")) $agent.value = params.get("agent");
 
+// ─── flow ───────────────────────────────────────────────────────────────
 $f.addEventListener("submit", async (e) => {
   e.preventDefault();
-  $err.textContent = "";
-  $result.hidden = true;
-  const idStr = $agentId.value.trim();
-  if (!idStr || !/^\d+$/.test(idStr)) {
-    $err.textContent = "Enter a numeric ERC-8004 agent id.";
-    return;
-  }
+  reset();
+  const idStr = $agent.value.trim();
+  if (!/^\d+$/.test(idStr)) { fail("Enter a numeric ERC-8004 agent id."); return; }
   const agentId = BigInt(idStr);
   $btn.disabled = true;
-  $status.textContent = "Reading ReputationRegistry on Eth Sepolia…";
+  setStatus("connecting to Eth Sepolia · reading reputation registry");
   try {
-    let threshold = DEFAULT_THRESHOLD;
-    let tag2 = "";
-    if (GATE) {
-      try {
-        const [t, tag] = await Promise.all([
-          client.readContract({ address: GATE, abi: GATE_ABI, functionName: "threshold" }),
-          client.readContract({ address: GATE, abi: GATE_ABI, functionName: "tag2Filter" }),
-        ]);
-        threshold = BigInt(t);
-        tag2 = tag;
-      } catch (gateErr) {
-        $status.textContent = "Gate not reachable, falling back to direct registry read with default threshold.";
-      }
-    }
-    const [count, summaryValue, summaryDec] = await client.readContract({
+    const [threshold, tag2Filter] = await readGateConfig();
+    setStatus("aggregating pulse-tagged feedback via getSummary");
+    const summary = await client.readContract({
       address: REPUTATION,
       abi: REGISTRY_ABI,
       functionName: "getSummary",
-      args: [agentId, [PULSE], "pulse", tag2],
+      args: [agentId, [PULSE], "pulse", tag2Filter],
     });
-    const score = BigInt(summaryValue);
+    const count = summary[0]; const score = summary[1]; const dec = summary[2];
     const tracked = count > 0n;
-    const approved = tracked && score >= threshold;
-    render({ agentId, count, score, summaryDec, threshold, tag2, approved, tracked });
-    $status.textContent = "";
-  } catch (rpcErr) {
-    $err.textContent = "RPC error: " + (rpcErr?.shortMessage || rpcErr?.message || String(rpcErr)).slice(0, 200);
-    $status.textContent = "";
+    const approved = tracked && BigInt(score) >= threshold;
+    setStatus("indexing recent commitment events");
+    const timeline = await fetchTimeline(agentId);
+    setStatus("");
+    render({ agentId, count, score: BigInt(score), dec, threshold, tag2Filter, approved, tracked, timeline });
+  } catch (e) {
+    fail("RPC error: " + (e?.shortMessage || e?.message || String(e)).slice(0, 220));
   } finally {
     $btn.disabled = false;
   }
 });
 
-function render({ agentId, count, score, summaryDec, threshold, tag2, approved, tracked }) {
+async function readGateConfig() {
+  if (!GATE) return [DEFAULT_THRESHOLD, ""];
+  try {
+    const [t, tag] = await Promise.all([
+      client.readContract({ address: GATE, abi: GATE_ABI, functionName: "threshold" }),
+      client.readContract({ address: GATE, abi: GATE_ABI, functionName: "tag2Filter" }),
+    ]);
+    return [BigInt(t), tag];
+  } catch {
+    setStatus("gate unreachable · falling back to default threshold");
+    return [DEFAULT_THRESHOLD, ""];
+  }
+}
+
+// Eth Sepolia targets ~12s per block; close enough for "~1h ago" relative formatting.
+const SECONDS_PER_BLOCK = 12;
+
+async function fetchTimeline(agentId) {
+  const latest = await client.getBlockNumber();
+  const args = { agentId };
+  // attach `latest` to log objects later so we can compute "Nh ago"
+  fetchTimeline.latest = latest;
+  // Walk backward in 50k chunks, stop early once we've collected enough finals.
+  const collected = [];
+  let head = latest;
+  for (let c = 0; c < LOG_CHUNKS; c++) {
+    if (head <= 0n) break;
+    const fromBlock = head > LOG_CHUNK ? head - LOG_CHUNK : 0n;
+    const toBlock = head;
+    const ranges = await Promise.all([
+      safeLogs({ address: PULSE, event: PULSE_EVENTS.Committed, args, fromBlock, toBlock }),
+      safeLogs({ address: PULSE, event: PULSE_EVENTS.Revealed, args, fromBlock, toBlock }),
+      safeLogs({ address: PULSE, event: PULSE_EVENTS.Violated, args, fromBlock, toBlock }),
+      safeLogs({ address: PULSE, event: PULSE_EVENTS.Expired, args, fromBlock, toBlock }),
+    ]);
+    for (const log of ranges[0]) collected.push({ kind: "Committed", ...log });
+    for (const log of ranges[1]) collected.push({ kind: "Kept", ...log });
+    for (const log of ranges[2]) collected.push({ kind: "Violated", ...log });
+    for (const log of ranges[3]) collected.push({ kind: "Expired", ...log });
+    if (countFinals(collected) >= LOG_TARGET) break;
+    head = fromBlock - 1n;
+  }
+  // Most recent first
+  collected.sort((a, b) =>
+    a.blockNumber === b.blockNumber
+      ? Number(b.logIndex - a.logIndex)
+      : Number(b.blockNumber - a.blockNumber)
+  );
+  // Drop dangling Committed when a terminal event for the same id appears later in time
+  const seenTerminal = new Set();
+  const out = [];
+  for (const e of collected) {
+    const id = e.args?.id?.toString();
+    if (!id) continue;
+    if (e.kind !== "Committed") {
+      seenTerminal.add(id);
+      out.push(e);
+    } else if (!seenTerminal.has(id)) {
+      out.push(e);
+    }
+  }
+  return out.slice(0, LOG_TARGET);
+}
+
+function countFinals(arr) {
+  return arr.filter(e => e.kind !== "Committed").length;
+}
+
+async function safeLogs(args) {
+  try {
+    return await client.getLogs(args);
+  } catch (e) {
+    console.warn("getLogs failed", e?.shortMessage || e?.message || e);
+    return [];
+  }
+}
+
+// ─── render ─────────────────────────────────────────────────────────────
+function render({ agentId, count, score, dec, threshold, tag2Filter, approved, tracked, timeline }) {
   const klass = !tracked ? "untracked" : approved ? "approved" : "rejected";
-  const verdict = !tracked
-    ? "UNTRACKED — no Pulse-tagged feedback yet"
+  const verdict = !tracked ? "NO SIGNAL" : approved ? "RHYTHM NORMAL" : "ARRHYTHMIA";
+  const verdictSub = !tracked
+    ? "agent is not tracked · zero pulse-tagged feedback"
     : approved
-      ? "APPROVED — passes Pulse gate"
-      : "REJECTED — below threshold";
-  $result.className = "banner " + klass;
+      ? `score ${score.toString()} ≥ ${threshold.toString()} · agent passes pulse gate`
+      : `score ${score.toString()} below threshold ${threshold.toString()} · gate rejects`;
+
+  const wave = renderWaveform(score, count, klass);
+  const cells = `
+    <div class="stats">
+      <div class="cell"><dt>agent id</dt><dd>#${agentId.toString()}</dd></div>
+      <div class="cell"><dt>pulse score</dt><dd class="${score < 0n ? 'neg' : score > 0n ? 'pos' : ''}">${score.toString()}</dd></div>
+      <div class="cell"><dt>feedbacks</dt><dd>${count.toString()}</dd></div>
+      <div class="cell"><dt>threshold</dt><dd>${threshold.toString()}</dd></div>
+    </div>
+  `;
+
+  const timelineHtml = timeline.length
+    ? `<div class="timeline">${timeline.map(rowHtml).join("")}</div>`
+    : `<div class="empty">no commitment events in last ${formatLookback(LOG_CHUNK * BigInt(LOG_CHUNKS))} blocks</div>`;
+
+  $result.className = "scope " + klass;
   $result.innerHTML = `
-    <div class="verdict">${verdict}</div>
-    <dl>
-      <dt>agent id</dt><dd>${agentId.toString()}</dd>
-      <dt>pulse score</dt><dd>${score.toString()} <span style="color:var(--muted)">(${count} feedback${count === 1n ? "" : "s"}, decimals ${summaryDec})</span></dd>
-      <dt>threshold</dt><dd>${threshold.toString()}${tag2 ? ` <span style="color:var(--muted)">(filtered to tag2="${tag2}")</span>` : ""}</dd>
-    </dl>
-    <div class="card links">
-      <h3>verify on chain</h3>
-      <a href="https://sepolia.etherscan.io/address/${REPUTATION}#readContract" target="_blank" rel="noopener">ReputationRegistry on Etherscan</a>
-      <a href="https://sepolia.etherscan.io/address/${PULSE}" target="_blank" rel="noopener">Pulse on Etherscan</a>
-      ${GATE ? `<a href="https://sepolia.etherscan.io/address/${GATE}" target="_blank" rel="noopener">Gate on Etherscan</a>` : ""}
-      <a href="https://8004scan.io" target="_blank" rel="noopener">8004scan.io</a>
+    <div class="scope-head">
+      <div>OSCILLOSCOPE · agent <span class="agent">#${agentId.toString()}</span></div>
+      <div>${tag2Filter ? `tag2: ${tag2Filter}` : "tag2: any"} · decimals ${dec}</div>
+    </div>
+    <div class="verdict-line">
+      <div class="verdict">${verdict}</div>
+      <div class="sub">${verdictSub}</div>
+    </div>
+    <div class="wave-wrap">
+      <div class="axis-label">trace · pulse(t)</div>
+      ${wave}
+    </div>
+    ${cells}
+    <div class="timeline-wrap">
+      <div class="timeline-head"><span>recent commitments</span><span class="count">${timeline.length} found</span></div>
+      ${timelineHtml}
+    </div>
+    <div class="meta">
+      <a href="https://sepolia.etherscan.io/address/${REPUTATION}#readContract" target="_blank" rel="noopener">registry ↗</a>
+      <a href="https://sepolia.etherscan.io/address/${PULSE}" target="_blank" rel="noopener">pulse ↗</a>
+      ${GATE ? `<a href="https://sepolia.etherscan.io/address/${GATE}" target="_blank" rel="noopener">gate ↗</a>` : ""}
+      <a href="https://8004scan.io" target="_blank" rel="noopener">8004scan ↗</a>
     </div>
   `;
   $result.hidden = false;
+  // count-up animate the pulse score
+  animateNumber($result.querySelector(".cell:nth-child(2) dd"), Number(score));
+}
+
+function rowHtml(e) {
+  const txUrl = `https://sepolia.etherscan.io/tx/${e.transactionHash}`;
+  const ago = relTime(fetchTimeline.latest - e.blockNumber);
+  return `
+    <div class="row">
+      <span class="badge ${e.kind.toLowerCase()}">${e.kind}</span>
+      <span class="id">cid #${e.args.id.toString()}</span>
+      <span class="ts">${ago} <span style="color:var(--dim)">· block ${e.blockNumber.toString()}</span></span>
+      <span class="tx"><a href="${txUrl}" target="_blank" rel="noopener">view ↗</a></span>
+    </div>
+  `;
+}
+
+function relTime(blockDelta) {
+  const seconds = Number(blockDelta) * SECONDS_PER_BLOCK;
+  if (seconds < 60) return `${seconds}s ago`;
+  const m = Math.floor(seconds / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+function renderWaveform(score, count, klass) {
+  // Encode score as the amplitude of a stylized EKG-ish trace.
+  // For untracked → flatline. Approved → tall + steady. Rejected → tall + collapses.
+  const W = 880, H = 140, MID = H / 2;
+  const isFlat = klass === "untracked";
+  const isFalling = klass === "rejected";
+  const baseAmp = isFlat ? 0 : Math.min(46, 16 + Math.log10(Math.max(1, Math.abs(Number(score)))) * 8);
+  const cycles = isFlat ? 0 : Math.max(2, Math.min(6, Number(count) || 2));
+
+  // EKG segments per cycle: short flat → P bump → flat → QRS spike (down/up/down) → flat → T bump → flat
+  const cycleW = W / cycles || W;
+  const pts = [];
+  const push = (x, y) => pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  push(0, MID);
+  if (isFlat) {
+    // a few barely-perceptible ripples then flat
+    for (let x = 0; x <= W; x += 2) {
+      const wobble = Math.sin(x * 0.08) * 0.6;
+      push(x, MID + wobble);
+    }
+  } else {
+    for (let c = 0; c < cycles; c++) {
+      const x0 = c * cycleW;
+      const a = baseAmp * (isFalling ? Math.pow(0.78, c) : 1);
+      // baseline left
+      push(x0 + cycleW * 0.05, MID);
+      // P bump up
+      push(x0 + cycleW * 0.12, MID - a * 0.18);
+      push(x0 + cycleW * 0.18, MID);
+      // Q dip
+      push(x0 + cycleW * 0.30, MID + a * 0.12);
+      // R spike up
+      push(x0 + cycleW * 0.34, MID - a);
+      // S dip
+      push(x0 + cycleW * 0.40, MID + a * 0.30);
+      push(x0 + cycleW * 0.48, MID);
+      // T bump
+      push(x0 + cycleW * 0.62, MID - a * 0.30);
+      push(x0 + cycleW * 0.74, MID);
+      push(x0 + cycleW * 0.95, MID);
+    }
+    push(W, MID);
+  }
+
+  const path = `M ${pts.join(" L ")}`;
+
+  return `
+    <svg class="wave" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <line x1="0" y1="${MID}" x2="${W}" y2="${MID}" class="gridmid" />
+      <line x1="0" y1="${MID - 40}" x2="${W}" y2="${MID - 40}" class="grid" />
+      <line x1="0" y1="${MID + 40}" x2="${W}" y2="${MID + 40}" class="grid" />
+      <path class="trace" d="${path}"
+        style="stroke-dasharray: 4000; stroke-dashoffset: 4000; animation: draw 1.4s cubic-bezier(.55,.05,.30,.98) forwards;" />
+      <style>@keyframes draw { to { stroke-dashoffset: 0; } }</style>
+    </svg>
+  `;
+}
+
+function animateNumber(el, target) {
+  if (!el) return;
+  const dur = 750; const t0 = performance.now();
+  const sign = target < 0 ? "-" : "";
+  const abs = Math.abs(target);
+  function step(t) {
+    const k = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - k, 3);
+    el.textContent = (sign + Math.round(abs * eased).toLocaleString());
+    if (k < 1) requestAnimationFrame(step);
+    else el.textContent = (sign + Math.round(abs).toLocaleString());
+  }
+  requestAnimationFrame(step);
+}
+
+function formatLookback(n) { return n.toLocaleString(); }
+function reset() { $err.hidden = true; $err.textContent = ""; $status.hidden = true; $result.hidden = true; }
+function fail(msg) { $err.textContent = msg; $err.hidden = false; $status.hidden = true; }
+function setStatus(msg) {
+  if (!msg) { $status.hidden = true; $status.textContent = ""; return; }
+  $status.textContent = msg; $status.hidden = false;
 }
 </script>
 </body>

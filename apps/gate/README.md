@@ -1,9 +1,10 @@
 # apps/gate — Pulse Gate reference frontend
 
 Single-file static page that demos the **read** side of Pulse: paste an
-ERC-8004 agent id, see whether they pass the Pulse-tagged feedback
-threshold, with a click-through to the on-chain reads that produced
-the verdict.
+ERC-8004 agent id, see their Pulse-tagged feedback rendered as a
+phosphor-green EKG trace, and get a `RHYTHM NORMAL` / `ARRHYTHMIA` /
+`NO SIGNAL` verdict. The agent's last 6 commitment events are pulled
+live from chain and shown as a tagged timeline.
 
 This is the **reference consumer** for protocols that want to gate
 behavior on Pulse reputation. It exists so the answer to "how do I read
@@ -15,8 +16,21 @@ Pulse rep?" is "clone this folder."
 - [viem](https://viem.sh) loaded from `esm.sh` CDN.
 - Reads the canonical ERC-8004 `ReputationRegistry.getSummary` directly
   on Eth Sepolia (or any chain via `?rpc=...`).
-- Optionally reads `PulseGatedGate.threshold()` + `tag2Filter()` if a
-  deployed gate address is passed via `?gate=0x...`.
+- Optionally reads `PulseGatedGate.threshold()` + `tag2Filter()` from
+  the deployed gate (defaults to the v0.7.0 deployment at
+  `0x4d11…9379`); override via `?gate=0x...`.
+- Indexes Pulse's `Committed` / `Revealed` / `Violated` / `Expired`
+  events for the queried agent via chunked `eth_getLogs` (50k blocks
+  per chunk to stay under PublicNode's cap), de-duplicates by
+  commitment id, surfaces the 6 most recent terminal events.
+
+## Aesthetic
+
+Oscilloscope / biomonitor brutalism. Pulse → literal pulse waveform.
+Score → encoded as the trace's amplitude. Verdict states are framed as
+cardiograph readings, not "approved/rejected" buttons. Major Mono
+Display + DM Mono via Google Fonts. Phosphor green + magenta accents
+on near-black. Subtle phosphor grid + film grain.
 
 ## Run it locally
 
@@ -35,9 +49,12 @@ anywhere that serves static HTML and it works.
 | Param | Purpose | Default |
 | --- | --- | --- |
 | `agent` | ERC-8004 agent id to pre-fill the input | (empty) |
-| `gate` | `PulseGatedGate` contract address to read threshold/tag2 from | (empty — falls back to direct registry read with `threshold=50`) |
-| `pulse` | Pulse contract address (used as the single client filter) | `0xbe1b…BF34` (Eth Sepolia) |
-| `threshold` | Override threshold when no `gate` is set | `50` |
+| `gate` | `PulseGatedGate` contract to read threshold/tag2 from | `0x4d11…9379` (deployed v0.7.0 gate, Eth Sepolia) |
+| `pulse` | Pulse contract address (single client filter for `getSummary`) | `0xbe1b…BF34` (Eth Sepolia) |
+| `threshold` | Override threshold when `gate` lookup fails | `50` |
+| `chunk` | Block range per `eth_getLogs` request | `49000` |
+| `chunks` | How many chunks to walk backward from head | `5` (≈ 245k blocks ≈ 34 days) |
+| `limit` | Max timeline rows to display | `6` |
 | `rpc` | RPC URL | publicnode Sepolia |
 
 ## What it actually does on click
