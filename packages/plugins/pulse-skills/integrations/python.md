@@ -113,3 +113,65 @@ system prompt. Match the JSON schemas to the Solidity types:
 
 Any framework that can drive web3.py works the same way: SmolAgents, the
 OpenAI Python SDK with the new tool API, custom loops, or research agents.
+
+## ERC-7857 iNFT (Python)
+
+Python clients can mint via web3.py + a small AES-GCM encrypt step. The
+proof shape is `abi.encode(bytes32 dataHash, bytes signature)` where the
+signature signs `keccak256(abi.encode(inft, "preimage", dataHash))` with
+the EIP-191 prefix:
+
+```python
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from eth_abi import encode
+from eth_account import Account
+from eth_account.messages import encode_defunct
+from web3 import Web3
+import os, json, secrets
+
+w3 = Web3(Web3.HTTPProvider("https://evmrpc-testnet.0g.ai"))  # 0G Galileo
+inft = w3.eth.contract(
+    address="0x180D8105dc415553e338BDB06251e8aC3e48227C",  # PulseAgentINFT
+    abi=json.loads(open("packages/sdk/src/abi-inft.json").read())  # or hand-rolled
+)
+
+state = json.dumps({
+    "agent": {"ens": "yourname.eth", "agentId": 42},
+    # ... your state ...
+})
+
+# 1. encrypt with AES-256-GCM (matches @pulse/sdk encryptStateBlob)
+key = secrets.token_bytes(32)
+iv = secrets.token_bytes(12)
+ct = AESGCM(key).encrypt(iv, state.encode(), None)
+data_hash = Web3.keccak(ct)
+
+# 2. build ECDSA preimage proof
+inner = Web3.keccak(encode(["address", "string", "bytes32"],
+                            [inft.address, "preimage", data_hash]))
+sig = Account.sign_message(encode_defunct(inner), private_key=tee_priv).signature
+proof = encode(["bytes32", "bytes"], [data_hash, sig])
+
+# 3. mint
+agent = Account.from_key(os.environ["AGENT_PRIVATE_KEY"])
+tx = inft.functions.mint([proof], ["py-agent-state-v1"], agent.address) \
+    .build_transaction({"from": agent.address, "nonce": w3.eth.get_transaction_count(agent.address),
+                        "gas": 600_000})
+signed = agent.sign_transaction(tx)
+h = w3.eth.send_raw_transaction(signed.rawTransaction).hex()
+print("mint tx:", h)
+```
+
+For the easier path, shell out to `bun run scripts/inft-bind.ts` from
+your Python loop — same flow, less crypto plumbing:
+
+```python
+import subprocess, json
+out = subprocess.run(
+    ["bun", "run", "scripts/inft-bind.ts", "--commitments", "9,12",
+     "--description", "py-agent-state-v1"],
+    capture_output=True, text=True
+)
+result = json.loads(out.stdout)
+print("tokenId:", result["zg"]["tokenId"])
+```

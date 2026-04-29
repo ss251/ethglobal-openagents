@@ -23,3 +23,24 @@ export type {Commitment, CommitInput, RevealInput, SealedReasoning} from "./type
 export type {PoolKey, SwapParams} from "./hook.js";
 export type {QuoteRequest, QuoteResponse} from "./trading.js";
 export type {AgentENSRecord, ResolveAgentArgs, SetAgentRecordsArgs} from "./ens.js";
+
+export {
+    encryptStateBlob,
+    decryptStateBlob,
+    buildMintProof,
+    buildTransferProof,
+    mintINFT,
+    bindPulseAgent,
+    recordCommitment,
+    readINFTState,
+    extractMintedTokenId,
+    INFT_ABI,
+    INFT_HUMAN_READABLE_ABI,
+    ZG_GALILEO_CHAIN_ID,
+    ZG_GALILEO_RPC,
+    ZG_STORAGE_INDEXER,
+    DEFAULT_MINT_GAS,
+    DEFAULT_BIND_GAS,
+    DEFAULT_RECORD_GAS
+} from "./inft.js";
+export type {EncryptedBlob, MintArgs, BindArgs, RecordArgs, INFTState} from "./inft.js";

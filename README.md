@@ -11,7 +11,7 @@
 [![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
 [![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
 [![Tests](https://img.shields.io/badge/forge%20test-27%2F27-brightgreen?style=flat-square)](#tests-27-passing)
-[![Release](https://img.shields.io/badge/release-v0.4.0-orange?style=flat-square)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v0.5.0-orange?style=flat-square)](CHANGELOG.md)
 [![ERC-7857](https://img.shields.io/badge/ERC--7857-iNFT%20on%200G-purple?style=flat-square)](https://chainscan-galileo.0g.ai/address/0x180D8105dc415553e338BDB06251e8aC3e48227C)
 [![Hermes](https://img.shields.io/badge/Hermes-Telegram%20gateway-7d5fff?style=flat-square)](https://hermes-agent.nousresearch.com/)
 [![ENS](https://img.shields.io/badge/ENS-pulseagent.eth-5298ff?style=flat-square)](https://sepolia.app.ens.domains/pulseagent.eth)
@@ -582,7 +582,7 @@ Release notes live in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog
 format). Tagged releases with downloadable archives are mirrored to
 [GitHub Releases](https://github.com/ss251/ethglobal-openagents/releases).
 
-Latest: [v0.4.0 — ERC-7857 iNFT on 0G + prize-track full coverage](CHANGELOG.md#040--2026-04-29--erc-7857-inft-on-0g--prize-track-full-coverage).
+Latest: [v0.5.0 — Real composability + verified docs + LLM-discoverable](CHANGELOG.md#050--2026-04-29--real-composability--verified-docs--llm-discoverable).
 
 ## License
 

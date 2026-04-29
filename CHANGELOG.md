@@ -9,6 +9,84 @@ GitHub Releases mirror this file; see
 <https://github.com/ss251/ethglobal-openagents/releases> for downloadable
 archives at each tag.
 
+## [0.5.0] — 2026-04-29 — Real composability + verified docs + LLM-discoverable
+
+The v0.4 ship had a real iNFT on chain but two product holes: (1) the
+encrypt + proof + mint primitives were locked inside `scripts/inft-bind.ts`
+so any external integrator had to copy the script, and (2) the framework
+integration recipes were written from training-time knowledge — verified
+against current official docs, several were wrong. v0.5.0 closes both.
+
+### Added — composability
+
+- **`@pulse/sdk` is a real consumable library**:
+  - `packages/sdk/src/inft.ts` — full ERC-7857 primitive surface:
+    `encryptStateBlob`, `decryptStateBlob`, `buildMintProof`,
+    `buildTransferProof`, `mintINFT`, `bindPulseAgent`, `recordCommitment`,
+    `readINFTState`, `extractMintedTokenId`, plus `INFT_ABI`,
+    `INFT_HUMAN_READABLE_ABI`, and 0G chain constants
+    (`ZG_GALILEO_CHAIN_ID`, `ZG_GALILEO_RPC`, `ZG_STORAGE_INDEXER`).
+  - `packages/sdk/src/abi-inft.ts` — full JSON ABI export (parseAbi can't
+    represent the `tuple[]` return shape of `commitmentsOf` cleanly).
+  - SDK builds cleanly to `dist/` (`tsc` produces `.js` + `.d.ts` for every
+    module, 9 modules total).
+  - `packages/sdk/package.json` versioned 0.5.0, with `files` array and
+    `repository` field — ready for `npm publish` when desired.
+- **`INTEGRATING.md`** — 30-minute path from clone to first revealed
+  commitment for fresh integrators.
+- **`llms.txt` + `llms-full.txt`** — [llmstxt.org](https://llmstxt.org) format
+  machine-readable navigation file at repo root, plus a full-content variant
+  (5515 lines / 240 KB) with every canonical doc embedded for offline LLM
+  consumption.
+
+### Changed — verified docs
+
+Every framework integration recipe was rewritten against **current official
+docs as of 2026-Q1** (verified by parallel research subagents pulling the
+canonical references):
+
+- **`hermes.md`** — dropped the hallucinated `import {tool} from "hermes-agent"`
+  and fake YAML config. Replaced with the ground-truth setup we actually
+  used in this repo (`link-skills.sh` symlink + native SkillUse + Telegram
+  gateway + Anthropic API key per AUTH_NOTES Finding 3). The agent invokes
+  Pulse skills by name through SkillUse — no custom tool registration.
+- **`langchain.md`** — migrated v0.2-era patterns to **LangChain JS v1.0**:
+  `tool()` factory replaces `DynamicStructuredTool`; `createAgent` from
+  `langchain` replaces `createReactAgent` from `@langchain/langgraph/prebuilt`;
+  `StateSchema` + `MessagesValue` replace the channels-object pattern.
+  Sources: docs.langchain.com/oss/javascript/.
+- **`elizaos.md`** — fixed 4 audit findings: (a) secrets via
+  `runtime.getSetting()` not `runtime.character.settings.secrets`,
+  (b) `examples` use `{name, content}` with `content.actions: string[]`
+  not `{user, content: {action}}`, (c) export a `Plugin` wrapper not loose
+  actions, (d) character file is **TypeScript** with **top-level**
+  `secrets`, not YAML with nested settings. `handler` returns
+  `ActionResult` (`{success, text?, data?}`) not bare object.
+  Sources: docs.elizaos.ai/plugins/reference.md, character-interface.md.
+- **`openclaw.md`** — total rewrite. **Skills are pure markdown**, not
+  "SKILL.md + handler.ts". Tools live in a **companion plugin** that uses
+  `definePluginEntry({register(api)})` and registers tools via
+  `api.registerTool({name, description, parameters: Type.Object({...}), execute})`
+  with **TypeBox** parameter schemas, not Zod or JSON-schema. Install via
+  `openclaw skills install <slug>` (ClawHub registry) or
+  `npx skills add https://github.com/.../<repo> --skill <name>`.
+  Sources: docs.openclaw.ai/tools/skills, plugins/building-plugins, clawhub
+  skill-format spec.
+- **`anthropic-sdk.md`, `python.md`** — already accurate against current
+  docs, only added the iNFT pattern.
+- **`scripts/inft-bind.ts` refactored to consume `@pulse/sdk`** — inline
+  encrypt + crypto + proof + ABI + writeContract calls all replaced with
+  imports. Same JSON contract on stdout. Verified: tokenId #2 minted on 0G
+  Galileo via the SDK-refactored path.
+- pulse-skills plugin/marketplace metadata bumped 0.4.0 → 0.5.0; SDK
+  versioned 0.5.0.
+
+### Verified live
+
+- All 27 forge tests pass (no contract changes).
+- Direct SDK consumer: `import { readINFTState } from "@pulse/sdk"` works
+  out of `dist/`. Commitments #1 + #2 readable from a fresh consumer.
+
 ## [0.4.0] — 2026-04-29 — ERC-7857 iNFT on 0G + prize-track full coverage
 
 The agent's identity is now an iNFT. `pulseagent.eth` is minted as
@@ -293,6 +371,7 @@ Initial protocol drop. Tagged so graders can pin to a specific commit.
   trade-offs: atomic-rollback gap, Anthropic body-size gating, and
   reveal-tx gas budgeting.
 
+[0.5.0]: https://github.com/ss251/ethglobal-openagents/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ss251/ethglobal-openagents/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ss251/ethglobal-openagents/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ss251/ethglobal-openagents/compare/v0.1.5...v0.2.0

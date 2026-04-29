@@ -1,0 +1,106 @@
+# Pulse Protocol
+
+> Sealed Agent Commitments — extending the audit perimeter to the agent's
+> reasoning. Agents commit their decisions before they execute them; sealed
+> reasoning, ERC-8004 reputation, and Uniswap v4 hook gating make drift
+> slashable and (at the v4 layer) physically impossible.
+
+Pulse is a hackathon project for ETHGlobal Open Agents 2026. It ships:
+
+- Three Solidity contracts (`Pulse.sol`, `PulseGatedHook.sol`,
+  `PulseAgentINFT.sol`) deployed on Eth Sepolia + 0G Galileo testnet.
+- A composable TypeScript SDK (`@pulse/sdk`) with primitives for commit,
+  reveal, hook-gated swap, ENS identity, sealed inference (0G Compute),
+  and ERC-7857 iNFT minting.
+- An agent-agnostic skill bundle (`pulse-skills`) installable via
+  `npx skills add ss251/ethglobal-openagents` — 9 skills, 6 framework
+  integration recipes (Anthropic SDK, Hermes, LangChain, ElizaOS,
+  OpenClaw, Python).
+- 27 forge tests, all passing.
+
+The on-chain identity stack: `pulseagent.eth` on Sepolia ENS resolves to
+ERC-8004 token id #3906 and is minted as ERC-7857 iNFT tokenId #1 on 0G
+Galileo. Every Pulse commitment the agent makes appends to the iNFT's
+on-chain history; transfer the iNFT and the new owner inherits the rep
+trail.
+
+## Documentation
+
+- [README](README.md): project overview, deployed addresses, prize-track context.
+- [INTEGRATING.md](INTEGRATING.md): 30-minute fresh-integrator path from clone to first revealed commitment.
+- [SPEC.md](SPEC.md): protocol specification — commitment lifecycle, hash schemes, signer-provider role.
+- [CHANGELOG.md](CHANGELOG.md): release history (Keep a Changelog format).
+- [FEEDBACK.md](FEEDBACK.md): builder feedback on the Uniswap Trading API (required for the Uniswap prize track).
+- [docs/adr/0001-audit-perimeter.md](docs/adr/0001-audit-perimeter.md): architecture-decision record explaining the threat model and three load-bearing trade-offs (atomic-rollback gap, Anthropic body-size gating, reveal-tx gas budgeting).
+
+## Smart contracts
+
+- [contracts/Pulse.sol](contracts/Pulse.sol): commit-reveal primitive. `commit`, `reveal`, `markExpired`. ERC-8004 `giveFeedback` on every transition.
+- [contracts/hooks/PulseGatedHook.sol](contracts/hooks/PulseGatedHook.sol): Uniswap v4 hook with only `BEFORE_SWAP_FLAG`. Swaps must include `hookData = abi.encode(commitmentId, nonce)`; mismatched intent reverts before any state change.
+- [contracts/inft/PulseAgentINFT.sol](contracts/inft/PulseAgentINFT.sol): ERC-7857 (intelligent NFT) implementation. `mint`, `transfer`, `clone`, `bindPulseAgent`, `recordCommitment`. Self-verifier pattern with ECDSA proofs.
+
+## Deploy scripts
+
+- [script/Deploy.s.sol](script/Deploy.s.sol): deploy `Pulse.sol`.
+- [script/DeployHook.s.sol](script/DeployHook.s.sol): CREATE2-mine + deploy `PulseGatedHook` with the `BEFORE_SWAP_FLAG` bits in its address.
+- [script/DeployINFT.s.sol](script/DeployINFT.s.sol): deploy `PulseAgentINFT` on 0G Galileo.
+
+## TypeScript SDK — `@pulse/sdk`
+
+- [packages/sdk/src/pulse.ts](packages/sdk/src/pulse.ts): `commitIntent`, `revealIntent`, `markExpiredIntent`, `PULSE_ABI`.
+- [packages/sdk/src/hook.ts](packages/sdk/src/hook.ts): `intentHashForSwap`, `encodeHookData`, `encodeSwapAction`.
+- [packages/sdk/src/zg.ts](packages/sdk/src/zg.ts): `sealedReason`, `fetchSealedReasoning` (0G Compute).
+- [packages/sdk/src/ens.ts](packages/sdk/src/ens.ts): `setAgentENSRecords`, `pulseProvenanceFromENS`, `resolveAgentByENS`.
+- [packages/sdk/src/trading.ts](packages/sdk/src/trading.ts): `quoteSwap`, `executeFromQuote`, `pulseHookData` (Uniswap Trading API).
+- [packages/sdk/src/inft.ts](packages/sdk/src/inft.ts): full ERC-7857 primitive surface — `encryptStateBlob`, `buildMintProof`, `mintINFT`, `bindPulseAgent`, `recordCommitment`, `readINFTState`.
+
+## Agent-facing CLI scripts
+
+- [scripts/autonomous-trade.ts](scripts/autonomous-trade.ts): keystone — reason → commit → wait → atomic-reveal swap.
+- [scripts/force-drift.ts](scripts/force-drift.ts): demo — drifted swap reverted by hook, watcher locks Violated.
+- [scripts/pulse-status.ts](scripts/pulse-status.ts): one-shot status read with window flags.
+- [scripts/pulse-introspect.ts](scripts/pulse-introspect.ts): recent agent txs OR `--commitment-id N` deep dive.
+- [scripts/pulse-retry.ts](scripts/pulse-retry.ts): recover Pending commitment after a swap revert (same nonce, no drift).
+- [scripts/inft-bind.ts](scripts/inft-bind.ts): mint pulseagent.eth as an ERC-7857 iNFT on 0G + bind + record commitments.
+- [scripts/watch-and-slash.ts](scripts/watch-and-slash.ts): off-chain watcher daemon that closes the atomic-reveal rollback gap.
+
+## Skills bundle — `pulse-skills`
+
+- [packages/plugins/pulse-skills/README.md](packages/plugins/pulse-skills/README.md): bundle overview + install.
+- [packages/plugins/pulse-skills/skills/pulse-autonomous-trade/SKILL.md](packages/plugins/pulse-skills/skills/pulse-autonomous-trade/SKILL.md): keystone skill.
+- [packages/plugins/pulse-skills/skills/pulse-commit/SKILL.md](packages/plugins/pulse-skills/skills/pulse-commit/SKILL.md): commit primitive.
+- [packages/plugins/pulse-skills/skills/pulse-reveal/SKILL.md](packages/plugins/pulse-skills/skills/pulse-reveal/SKILL.md): reveal primitive.
+- [packages/plugins/pulse-skills/skills/pulse-status-check/SKILL.md](packages/plugins/pulse-skills/skills/pulse-status-check/SKILL.md): status read.
+- [packages/plugins/pulse-skills/skills/pulse-gated-swap/SKILL.md](packages/plugins/pulse-skills/skills/pulse-gated-swap/SKILL.md): Uniswap v4 swap through Pulse.
+- [packages/plugins/pulse-skills/skills/pulse-recover/SKILL.md](packages/plugins/pulse-skills/skills/pulse-recover/SKILL.md): recover Pending commitment.
+- [packages/plugins/pulse-skills/skills/pulse-introspect/SKILL.md](packages/plugins/pulse-skills/skills/pulse-introspect/SKILL.md): inspect activity.
+- [packages/plugins/pulse-skills/skills/pulse-inft/SKILL.md](packages/plugins/pulse-skills/skills/pulse-inft/SKILL.md): ERC-7857 iNFT mint.
+- [packages/plugins/pulse-skills/skills/sealed-inference-with-pulse/SKILL.md](packages/plugins/pulse-skills/skills/sealed-inference-with-pulse/SKILL.md): TEE-attested sealed reasoning (0G Compute).
+
+## Framework integration recipes
+
+- [packages/plugins/pulse-skills/integrations/anthropic-sdk.md](packages/plugins/pulse-skills/integrations/anthropic-sdk.md): Anthropic API + Claude Agent SDK.
+- [packages/plugins/pulse-skills/integrations/hermes.md](packages/plugins/pulse-skills/integrations/hermes.md): Hermes (Nous Research).
+- [packages/plugins/pulse-skills/integrations/langchain.md](packages/plugins/pulse-skills/integrations/langchain.md): LangChain / LangGraph.
+- [packages/plugins/pulse-skills/integrations/elizaos.md](packages/plugins/pulse-skills/integrations/elizaos.md): ElizaOS / Eliza.
+- [packages/plugins/pulse-skills/integrations/openclaw.md](packages/plugins/pulse-skills/integrations/openclaw.md): OpenClaw.
+- [packages/plugins/pulse-skills/integrations/python.md](packages/plugins/pulse-skills/integrations/python.md): Python (web3.py).
+
+## Optional
+
+- [hermes-sandbox/SOUL.md](hermes-sandbox/SOUL.md): persona for the Pulse agent running inside a Hermes container with a Telegram gateway.
+- [hermes-sandbox/AUTH_NOTES.md](hermes-sandbox/AUTH_NOTES.md): three non-obvious blockers we hit wiring Claude Pro/Max OAuth into the Hermes container — Keychain stale entries, Anthropic body-size gating, skills toolset.
+- [deployments/sepolia.json](deployments/sepolia.json): full deployment record for Eth Sepolia.
+
+## Deployed addresses
+
+- Eth Sepolia (chainId 11155111):
+  - `Pulse`: `0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34`
+  - `PulseGatedHook`: `0x274b3c0f55c2db8c392418649c1eb3aad1ecc080`
+  - `pUSD` (mock): `0xB1e9c59B50D3b79cA09f4f9fd6ca5cC027EAeDDA`
+  - `pWETH` (mock): `0xC8d229E60C4a02fA49D060B1f0b08D956E6ef349`
+  - ERC-8004 IdentityRegistry (canonical): `0x8004A818BFB912233c491871b3d84c89A494BD9e`
+  - ERC-8004 ReputationRegistry (canonical): `0x8004B663056A597Dffe9eCcC1965A193B7388713`
+- 0G Galileo (chainId 16602):
+  - `PulseAgentINFT`: `0x180D8105dc415553e338BDB06251e8aC3e48227C` (tokenId 1 holds pulseagent.eth's encrypted state)
+- ENS (Sepolia): `pulseagent.eth` — five text records bind agentId, signerProvider, pulseHistory, description, avatar, plus `0g.inft = 0g-galileo:16602:0x180D8105…:1` for the iNFT pointer.

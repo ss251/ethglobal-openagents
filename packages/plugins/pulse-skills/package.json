@@ -1,6 +1,6 @@
 {
   "name": "@pulse/skills",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Agent-agnostic skills for Pulse — galaxy-brain-resistant onchain commitments with optional Uniswap v4 hook gating",
   "license": "MIT",

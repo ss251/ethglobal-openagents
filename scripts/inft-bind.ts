@@ -41,18 +41,29 @@ import {
     createPublicClient,
     createWalletClient,
     http,
-    keccak256,
     namehash,
-    parseAbi,
-    toHex
+    parseAbi
 } from "viem";
 import {privateKeyToAccount} from "viem/accounts";
 import {sepolia} from "viem/chains";
-import {randomBytes, createCipheriv} from "node:crypto";
 
 import {loadEnv, requireEnv} from "./_lib/env";
 import {zgGalileo, ZG_STORAGE_INDEXER, ZG_FAUCET} from "./_lib/zg";
 import {step, runMain} from "./_lib/output";
+
+// Full iNFT primitives ship in the SDK so any external integrator can do
+// the same flow with a fraction of this code. The orchestrator below is
+// just the CLI shape — encrypt + proof + mint + bind + record + ENS-text
+// all live in @pulse/sdk.
+import {
+    encryptStateBlob,
+    buildMintProof,
+    mintINFT,
+    bindPulseAgent as sdkBindPulseAgent,
+    recordCommitment as sdkRecordCommitment,
+    readINFTState,
+    INFT_ABI as SDK_INFT_ABI
+} from "../packages/sdk/src/inft";
 
 loadEnv();
 
@@ -112,49 +123,12 @@ const zgWallet = createWalletClient({account: agent, chain: zgGalileo, transport
 const sepClient = createPublicClient({chain: sepolia, transport: http(SEPOLIA_RPC)});
 const sepWallet = createWalletClient({account: agent, chain: sepolia, transport: http(SEPOLIA_RPC)});
 
-const INFT_ABI = parseAbi([
-    "function mint(bytes[] proofs, string[] descriptions, address to) payable returns (uint256 tokenId)",
-    "function bindPulseAgent(uint256 tokenId, uint256 agentId, bytes32 ensNode, address pulse, uint256 pulseChainId)",
-    "function recordCommitment(uint256 tokenId, uint256 commitmentId, uint256 pulseChainId)",
-    "function ownerOf(uint256 tokenId) view returns (address)",
-    "function dataHashesOf(uint256 tokenId) view returns (bytes32[])",
-    "function dataDescriptionsOf(uint256 tokenId) view returns (string[])",
-    "function tokenURI(uint256 tokenId) view returns (string)",
-    "function commitmentsOf(uint256 tokenId) view returns ((uint256 commitmentId, uint256 pulseChainId, uint64 recordedAt)[])",
-    "function signerProvider() view returns (address)",
-    "function totalSupply() view returns (uint256)",
-    "event Minted(uint256 indexed tokenId, address indexed creator, address indexed owner, bytes32[] dataHashes, string[] dataDescriptions)",
-    "event PulseBound(uint256 indexed tokenId, uint256 indexed agentId, bytes32 ensNode, address pulse, uint256 pulseChainId)",
-    "event CommitmentRecorded(uint256 indexed tokenId, uint256 indexed commitmentId, uint256 pulseChainId, uint256 totalCommitments)"
-]);
+const INFT_ABI = SDK_INFT_ABI;
 
 const ENS_RESOLVER_ABI = parseAbi([
     "function setText(bytes32 node, string key, string value)",
     "function text(bytes32 node, string key) view returns (string)"
 ]);
-
-interface EncryptedBlob {
-    keyHex: Hex;
-    ivHex: Hex;
-    ciphertextHex: Hex;
-    dataHash: Hex;
-}
-
-function encryptBlob(plaintext: string): EncryptedBlob {
-    const key = randomBytes(32);
-    const iv = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", key, iv);
-    const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-    const tag = cipher.getAuthTag();
-    const ciphertext = Buffer.concat([encrypted, tag]); // include auth tag at the tail
-    const dataHash = keccak256(toHex(ciphertext));
-    return {
-        keyHex: `0x${key.toString("hex")}`,
-        ivHex: `0x${iv.toString("hex")}`,
-        ciphertextHex: `0x${ciphertext.toString("hex")}`,
-        dataHash
-    };
-}
 
 async function uploadToZGStorage(_data: Hex): Promise<string> {
     // The 0G Storage indexer is HTTP-based. For the hackathon we capture
@@ -215,9 +189,9 @@ async function main() {
         throw new Error("signer mismatch");
     }
 
-    // ── 1. encrypt the agent state blob ───────────────────────────────────
-    step("\n→ encrypt state blob (AES-256-GCM)");
-    const blob = encryptBlob(blobPlaintext);
+    // ── 1. encrypt the agent state blob (SDK primitive) ───────────────────
+    step("\n→ encrypt state blob (AES-256-GCM via @pulse/sdk)");
+    const blob = encryptStateBlob(blobPlaintext);
     step(`  dataHash  : ${blob.dataHash}`);
     step(`  ciphertext: ${blob.ciphertextHex.length / 2 - 1} bytes (sealed key kept off-chain)`);
 
@@ -225,32 +199,16 @@ async function main() {
     const storageUri = await uploadToZGStorage(blob.ciphertextHex);
     step(`  storageURI: ${storageUri}`);
 
-    // ── 3. build TEE preimage proof ────────────────────────────────────────
-    // Contract-side: keccak256(abi.encode(inft, "preimage", dataHash)) is
-    // hashed, then ECDSA.toEthSignedMessageHash() is applied (inside OZ).
-    // We sign over the inner digest with viem.signMessage, which auto-prepends
-    // the EthSignedMessage prefix — so the contract recovers the same address.
-    const {encodeAbiParameters} = await import("viem");
-    const preimageDigest = keccak256(
-        encodeAbiParameters(
-            [{type: "address"}, {type: "string"}, {type: "bytes32"}],
-            [INFT_ADDRESS, "preimage", blob.dataHash]
-        )
-    );
-    const preimageSig = await tee.signMessage({message: {raw: preimageDigest}});
-    const proof = encodeAbiParameters(
-        [{type: "bytes32"}, {type: "bytes"}],
-        [blob.dataHash, preimageSig]
-    );
+    // ── 3. build TEE preimage proof (SDK primitive) ────────────────────────
+    const proof = await buildMintProof(tee, INFT_ADDRESS, blob.dataHash);
 
-    // ── 4. mint ───────────────────────────────────────────────────────────
+    // ── 4. mint (SDK primitive) ────────────────────────────────────────────
     step("\n→ mint PulseAgentINFT");
-    const mintTx = await zgWallet.writeContract({
-        address: INFT_ADDRESS,
-        abi: INFT_ABI,
-        functionName: "mint",
-        args: [[proof], [description], agent.address],
-        gas: 600_000n
+    const mintTx = await mintINFT(zgWallet, {
+        inftAddress: INFT_ADDRESS,
+        proofs: [proof],
+        dataDescriptions: [description],
+        to: agent.address
     });
     const mintStatus = await waitReceiptResilient(mintTx);
     if (mintStatus === "reverted") {
@@ -268,20 +226,21 @@ async function main() {
     step(`  mint tx   : ${mintTx}`);
     step(`  tokenId   : ${tokenId}`);
 
-    // ── 5. bindPulseAgent ─────────────────────────────────────────────────
+    // ── 5. bindPulseAgent (SDK primitive) ──────────────────────────────────
     step("\n→ bindPulseAgent");
     const ensNode = namehash(ENS_NAME);
-    const bindTx = await zgWallet.writeContract({
-        address: INFT_ADDRESS,
-        abi: INFT_ABI,
-        functionName: "bindPulseAgent",
-        args: [tokenId, AGENT_ID, ensNode, PULSE_ADDRESS, 11155111n],
-        gas: 200_000n
+    const bindTx = await sdkBindPulseAgent(zgWallet, {
+        inftAddress: INFT_ADDRESS,
+        tokenId,
+        agentId: AGENT_ID,
+        ensNode,
+        pulse: PULSE_ADDRESS,
+        pulseChainId: 11155111n
     });
     await waitReceiptResilient(bindTx);
     step(`  bind tx   : ${bindTx}`);
 
-    // ── 6. recordCommitment for each provided id ───────────────────────────
+    // ── 6. recordCommitment for each provided id (SDK primitive) ───────────
     const commitTxs: Hex[] = [];
     if (commitmentsCsv) {
         const ids = commitmentsCsv
@@ -291,12 +250,11 @@ async function main() {
         step(`\n→ recordCommitment (${ids.length} commitments)`);
         for (const idStr of ids) {
             const id = BigInt(idStr);
-            const tx = await zgWallet.writeContract({
-                address: INFT_ADDRESS,
-                abi: INFT_ABI,
-                functionName: "recordCommitment",
-                args: [tokenId, id, 11155111n],
-                gas: 150_000n
+            const tx = await sdkRecordCommitment(zgWallet, {
+                inftAddress: INFT_ADDRESS,
+                tokenId,
+                commitmentId: id,
+                pulseChainId: 11155111n
             });
             const s = await waitReceiptResilient(tx);
             step(`  cid #${id} → ${tx} (${s})`);
@@ -320,25 +278,8 @@ async function main() {
         step(`  text 0g.inft = ${value}`);
     }
 
-    // ── 8. read back for the JSON output ──────────────────────────────────
-    const ownerOf = (await zgClient.readContract({
-        address: INFT_ADDRESS,
-        abi: INFT_ABI,
-        functionName: "ownerOf",
-        args: [tokenId]
-    })) as Address;
-    const dataHashes = (await zgClient.readContract({
-        address: INFT_ADDRESS,
-        abi: INFT_ABI,
-        functionName: "dataHashesOf",
-        args: [tokenId]
-    })) as Hex[];
-    const tokenUri = (await zgClient.readContract({
-        address: INFT_ADDRESS,
-        abi: INFT_ABI,
-        functionName: "tokenURI",
-        args: [tokenId]
-    })) as string;
+    // ── 8. read back for the JSON output (SDK primitive) ──────────────────
+    const state = await readINFTState(zgClient, INFT_ADDRESS, tokenId);
 
     return {
         scenario: "inft-bind",
@@ -347,9 +288,9 @@ async function main() {
             chainId: zgGalileo.id,
             inft: INFT_ADDRESS,
             tokenId: tokenId.toString(),
-            owner: ownerOf,
-            tokenURI: tokenUri,
-            dataHashes,
+            owner: state.owner,
+            tokenURI: state.tokenURI,
+            dataHashes: state.dataHashes,
             description,
             mintTx,
             bindTx,

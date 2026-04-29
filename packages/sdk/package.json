@@ -1,9 +1,15 @@
 {
   "name": "@pulse/sdk",
-  "version": "0.0.1",
-  "description": "TypeScript SDK for Pulse — sealed agent commitments. Trading API + ENS identity + sealed-inference + v4 hook helpers.",
+  "version": "0.5.0",
+  "description": "TypeScript SDK for Pulse — sealed agent commitments. Trading API + ENS identity + sealed-inference + v4 hook + ERC-7857 iNFT helpers.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": ["dist", "src", "README.md"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ss251/ethglobal-openagents.git",
+    "directory": "packages/sdk"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
