@@ -1,12 +1,12 @@
 {
   "name": "@pulse/skills",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Agent-agnostic skills for Pulse — galaxy-brain-resistant onchain commitments with optional Uniswap v4 hook gating",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thescoho/ethglobal-openagents.git",
+    "url": "https://github.com/ss251/ethglobal-openagents.git",
     "directory": "packages/plugins/pulse-skills"
   },
   "keywords": [

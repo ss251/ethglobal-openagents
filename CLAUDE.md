@@ -6,7 +6,7 @@ with TEE-attested reasoning. ERC-8004 reputation hooks. Optional Uniswap v4 hook
 gating swaps by Pulse commitments. Ships with `pulse-skills` — a drop-in
 agent-agnostic skills bundle (`packages/plugins/pulse-skills/`) so any agent
 framework (OpenClaw, Hermes, ElizaOS, LangChain, custom) can plug into Pulse
-via `npx skills add thescoho/ethglobal-openagents` or `/plugin install`.
+via `npx skills add ss251/ethglobal-openagents` or `/plugin install`.
 
 ## Toolchain
 - Solidity 0.8.26, EVM Cancun, via_ir on

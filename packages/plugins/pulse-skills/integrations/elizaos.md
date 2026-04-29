@@ -9,13 +9,13 @@ backed by `@pulse/sdk`.
 ```bash
 npm install @pulse/sdk
 # in your eliza repo
-git submodule add https://github.com/thescoho/ethglobal-openagents .eliza/skills/pulse
+git submodule add https://github.com/ss251/ethglobal-openagents .eliza/skills/pulse
 ```
 
 Or use skills.sh if your ElizaOS fork supports it:
 
 ```bash
-npx skills add thescoho/ethglobal-openagents
+npx skills add ss251/ethglobal-openagents
 ```
 
 ## Plugin scaffold

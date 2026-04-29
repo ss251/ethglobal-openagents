@@ -8,7 +8,7 @@ flow, and the handler imports `@pulse/sdk` for the actual chain calls.
 
 ```bash
 # from anywhere a CLAUDE.md / AGENTS.md project lives
-npx skills add thescoho/ethglobal-openagents
+npx skills add ss251/ethglobal-openagents
 ```
 
 This pulls the entire skill bundle into `.claude/skills/` (or `.openclaw/skills/`,

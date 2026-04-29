@@ -11,7 +11,7 @@ If your Hermes setup already supports `npx skills add` (Vercel's skills.sh
 CLI):
 
 ```bash
-npx skills add thescoho/ethglobal-openagents
+npx skills add ss251/ethglobal-openagents
 ```
 
 Otherwise just clone the repo and copy `packages/plugins/pulse-skills/skills/`

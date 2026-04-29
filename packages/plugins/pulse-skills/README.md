@@ -19,23 +19,26 @@ bundle. Each skill in this folder is an agent-agnostic SKILL.md that any
 runner with a skills loader can install via:
 
 ```bash
-npx skills add thescoho/ethglobal-openagents
+npx skills add ss251/ethglobal-openagents
 ```
 
 Or via the Claude Code marketplace:
 
 ```bash
-/plugin install pulse-skills@thescoho/ethglobal-openagents
+/plugin install pulse-skills@ss251/ethglobal-openagents
 ```
 
 ## Skills
 
 | Skill                          | What it does                                                                                              |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| [pulse-autonomous-trade](./skills/pulse-autonomous-trade/SKILL.md) | **Keystone.** End-to-end reason → commit → wait → atomic-reveal swap from a natural-language objective. |
 | [pulse-commit](./skills/pulse-commit/SKILL.md)             | Lock the agent into a hashed action + sealed reasoning at time T.                          |
 | [pulse-reveal](./skills/pulse-reveal/SKILL.md)             | Close the commitment by submitting matching nonce + actionData inside the window.          |
 | [pulse-status-check](./skills/pulse-status-check/SKILL.md) | Read commitment state cheaply before reveal/swap/expire.                                   |
 | [pulse-gated-swap](./skills/pulse-gated-swap/SKILL.md)     | Execute a Uniswap v4 swap *through* a Pulse commitment — wrong intent → swap reverts.      |
+| [pulse-recover](./skills/pulse-recover/SKILL.md)           | Re-submit a gated swap when a previous run committed but the swap reverted (same intent, same nonce). |
+| [pulse-introspect](./skills/pulse-introspect/SKILL.md)     | Inspect recent agent-wallet activity or a single commitment without writing a block-scanner. |
 | [sealed-inference-with-pulse](./skills/sealed-inference-with-pulse/SKILL.md) | Pull TEE-signed reasoning from 0G Compute (or any EIP-191 signer) and bind it to commit.   |
 
 The skills compose. A typical autonomous-agent flow is:
@@ -44,6 +47,12 @@ The skills compose. A typical autonomous-agent flow is:
 sealed-inference-with-pulse  →  pulse-commit  →  pulse-status-check  →  pulse-gated-swap
                                                                   ↘  pulse-reveal (non-swap path)
 ```
+
+The keystone `pulse-autonomous-trade` runs that whole sequence in a single
+turn from a natural-language trading objective. When the swap reverts mid-flow,
+`pulse-recover` settles the pending commitment with the original nonce; when
+the agent needs to diagnose state, `pulse-introspect` replaces ad-hoc inline
+block-scanners.
 
 ## Framework integrations
 

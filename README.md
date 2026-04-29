@@ -11,7 +11,7 @@
 [![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
 [![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
 [![Tests](https://img.shields.io/badge/forge%20test-17%2F17-brightgreen?style=flat-square)](#tests-17-passing)
-[![Release](https://img.shields.io/badge/release-v0.3.0-orange?style=flat-square)](#release-history)
+[![Release](https://img.shields.io/badge/release-v0.3.0-orange?style=flat-square)](CHANGELOG.md)
 [![Hermes](https://img.shields.io/badge/Hermes-Telegram%20gateway-7d5fff?style=flat-square)](https://hermes-agent.nousresearch.com/)
 [![ENS](https://img.shields.io/badge/ENS-pulseagent.eth-5298ff?style=flat-square)](https://sepolia.app.ens.domains/pulseagent.eth)
 
@@ -21,7 +21,7 @@ flowchart TD
     subgraph OFF["🛠 Off-chain — agent runtime · reasoning · market data"]
         direction LR
         Hermes["<b>Hermes container</b><br/>Nous Research<br/>Claude Max via OAuth"]
-        Skills["<b>pulse-skills bundle</b><br/>SKILL.md × 5"]
+        Skills["<b>pulse-skills bundle</b><br/>SKILL.md × 8"]
         Agent(["<b>Agent EOA</b><br/>pulseagent.eth<br/>0x30cB…397c · ERC-8004 #3906"])
         ZG["<b>0G Compute</b><br/>TEE-attested qwen-2.5-7b<br/>provider 0xa48f…"]
         Trade["<b>Uniswap Trading API</b><br/>/v1/quote · DUTCH_V2"]
@@ -92,12 +92,24 @@ flowchart TD
 
 > **Quick start.** `forge build && forge test` for the contracts;
 > `bun run scripts/e2e-commit-reveal.ts` for the full commit / reveal /
-> violated / expired flow on Eth Sepolia. Seven end-to-end scripts under
-> [`scripts/`](scripts/) cover every load-bearing flow — see
-> [Live demos on Eth Sepolia](#live-demos-on-eth-sepolia).
+> violated / expired flow on Eth Sepolia. Seven demo scripts under
+> [`scripts/`](scripts/) exercise every load-bearing flow on the deployed
+> contracts — see [Live demos on Eth Sepolia](#live-demos-on-eth-sepolia).
+> Plus the agent-facing helpers (`autonomous-trade.ts`, `pulse-retry.ts`,
+> `pulse-introspect.ts`, `pulse-status.ts`) used by the eight `pulse-skills`.
 >
 > **Architecture rationale + threat-model trade-offs.** See
 > [`docs/adr/0001-audit-perimeter.md`](docs/adr/0001-audit-perimeter.md).
+>
+> **Contents.** [What Pulse does](#what-pulse-does) ·
+> [Components](#components) · [Architecture](#architecture) ·
+> [Quick start](#quick-start) · [Repository layout](#repository-layout) ·
+> [Skills](#skills) ·
+> [How to plug your agent into Pulse](#how-to-plug-your-agent-into-pulse) ·
+> [Threat model](#threat-model--what-pulse-defends-against-and-what-it-doesnt) ·
+> [Status](#status) · [Live demos](#live-demos-on-eth-sepolia) ·
+> [Hermes integration](#hermes-integration--autonomous-pulse-bound-trading-agent-in-telegram) ·
+> [Releases](#releases) · [License](#license)
 
 On April 18, 2026, KelpDAO and Aave lost $292 million. The smart contracts
 were fine. No bug, no broken logic. The vulnerability was a single off-chain
@@ -250,13 +262,25 @@ script/
 test/
 ├── Pulse.t.sol                     # 6 tests on the commitment primitive
 └── PulseGatedHook.t.sol            # 11 tests on the v4 hook layer
+scripts/                            # agent-facing TS runners (every skill wraps one)
+├── _lib/                           # env loader, ABIs, direction-aware funding, Pulse helpers, BigInt-safe JSON
+├── autonomous-trade.ts             # keystone: reason → commit → atomic-reveal swap
+├── force-drift.ts                  # demo: hook + slash protection
+├── pulse-retry.ts                  # recover Pending commitment after a swap revert
+├── pulse-introspect.ts             # recent agent txs OR commitment deep-dive
+├── pulse-status.ts                 # one-shot status read with window flags
+└── *.ts                            # phase / e2e / sealed-inference / ENS / watcher scripts
 packages/
 ├── sdk/                            # @pulse/sdk — TypeScript client + intent/hookData helpers
 ├── agent/                          # reference agent that uses Pulse
 └── plugins/
     └── pulse-skills/               # agent-agnostic skill bundle (any agent can install)
+hermes-sandbox/                     # Hermes (NousResearch) container wiring + SOUL.md persona
+docs/
+└── adr/                            # architecture-decision records
+ai/diagrams/                        # Mermaid + Excalidraw architecture diagrams
 .claude/
-└── skills/                         # third-party skills consumed in this repo (Uniswap, OZ, Pashov, ethskills, 0g-compute)
+└── skills/                         # third-party skills consumed in this repo (Uniswap, OZ, ethskills, 0g-compute)
 ```
 
 ## Skills
@@ -441,19 +465,19 @@ hashes you can open in Etherscan.
 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
 container. You **chat with it in Telegram**. The agent has a persona
 (`hermes-sandbox/SOUL.md`), a wallet (the agent EOA, ERC-8004 #3906),
-six pulse-skills loaded by name via SkillUse, and the full Hermes tool
-catalog enabled (memory, cronjob, todo, clarify, terminal, file,
-skills). The container's entrypoint is `hermes gateway run` — the
-gateway polls Telegram, persists sessions per `chat_id` in SQLite,
-auto-routes voice memos through Whisper, and invokes pulse-skills
-exactly like Hermes' own bundled skills.
+the full eight-skill `pulse-skills` bundle loaded by name via SkillUse,
+and the full Hermes tool catalog enabled (memory, cronjob, todo,
+clarify, terminal, file, skills). The container's entrypoint is `hermes
+gateway run` — the gateway polls Telegram, persists sessions per
+`chat_id` in SQLite, auto-routes voice memos through Whisper, and invokes
+pulse-skills exactly like Hermes' own bundled skills.
 
 #### Demo prompts (sent to `@<your-bot>` in Telegram)
 
 | Prompt | What the agent does |
 | --- | --- |
 | `What's the status of commitment 8?` | Loads `pulse-status-check`, calls `bun run scripts/pulse-status.ts 8`, reports status + window + recommended watcher action with clickable Etherscan links. |
-| `Sell 0.01 pETH for at least 1800 pUSD.` | Loads `pulse-autonomous-trade`, runs the keystone executor: 0G TEE-attested reasoning → `intentHash` → `Pulse.commit` → wait `executeAfter` (~30s) → atomic-reveal swap through `PulseGatedHook` → reports cid + commit tx + swap tx. Status flips to `Revealed`, +100 ERC-8004 reputation. |
+| `Sell 0.005 pETH for at least 1500 pUSD.` | Loads `pulse-autonomous-trade` *autonomously* (no skill name in the prompt — `SOUL.md` steers the choice). Runs the keystone executor: 0G TEE-attested reasoning → `intentHash` → `Pulse.commit` → wait `executeAfter` (~30s) → atomic-reveal swap through `PulseGatedHook` → reports cid + commit tx + swap tx. Status flips to `Revealed`, +100 ERC-8004 reputation. Verified live as cid #12. |
 | `Now drift the agent — execute a different swap than what was committed.` | Loads `pulse-autonomous-trade` and runs `scripts/force-drift.ts`. The hook reverts the drifted swap before any state change; the watcher closes the rollback gap with a direct `Pulse.reveal(drifted_data)`; commitment goes `Violated`, **−1000 ERC-8004 reputation**. The killshot demo. |
 | `Resolve pulseagent.eth and show me the bound text records.` | Loads `pulse-status-check` (or just terminal), runs ENS resolution against the Public Resolver, surfaces all five text records (agentId, signerProvider, pulseHistory, description, avatar). |
 | `Schedule a portfolio status check every 5 minutes.` | Uses the `cronjob` tool to schedule recurring `pulse-status-check` runs. Results land in your Telegram DM via the gateway's home-channel route. |
@@ -498,12 +522,13 @@ That's it. Open Telegram → `@<your-bot>` → start chatting.
                         │     │      ↓                       │
                         │     │   pulse-autonomous-trade ──→ │ terminal
                         │     │   pulse-status-check         │ tool
+                        │     │   pulse-recover              │   ↓
+                        │     │   pulse-introspect           │ bun run
                         │     │   pulse-commit / -reveal     │   ↓
-                        │     │   pulse-gated-swap           │ bun run
-                        │     │   sealed-inference-with-pulse│   ↓
-                        │     │                              │ scripts/
-                        │     └─ Anthropic API key path      │ autonomous-
-                        └────────────────────────────────────┘ trade.ts
+                        │     │   pulse-gated-swap           │ scripts/
+                        │     │   sealed-inference-with-pulse│ *.ts
+                        │     └─ Anthropic API key path      │
+                        └────────────────────────────────────┘
                                        │
                        ┌───────────────┴────────────────┐
                        ↓                                ↓
@@ -530,185 +555,13 @@ was deleted in v0.2.0 because:
 
 The Hermes gateway is the canonical shape. We followed the docs.
 
-## Release history
+## Releases
 
-### v0.3.0 — Integrator pass: drop-in agent recovery + script library *(2026-04-29)*
+Release notes live in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog
+format). Tagged releases with downloadable archives are mirrored to
+[GitHub Releases](https://github.com/ss251/ethglobal-openagents/releases).
 
-Born out of the un-coached Telegram test. With no skill name in the prompt,
-the agent autonomously loaded `pulse-autonomous-trade` and committed to
-Pulse — proving SOUL.md is load-bearing. But the swap reverted (~30k gas)
-because `ensureFundedAndApproved` only checked TOKEN0 balance and skipped
-minting TOKEN1 (the token being sold). The agent then spent twelve minutes
-writing inline viem block-scanners and a one-shot retry script before
-recovering. v0.3.0 turns that whole detour into a single helper invocation.
-
-- **`scripts/_lib/`** — shared library so every script behaves the same.
-  - `env.ts` — explicit `.env` loader that *overrides* shell env. Closes
-    the AGENT_ID=5263-from-OpenClaw-bot leak that signed commits for the
-    wrong agent in the un-coached run.
-  - `funding.ts` — direction-aware funding. Only checks + mints + approves
-    the token actually being sold. Replaces the buggy ensureFundedAndApproved
-    that copy-paste lived in two scripts.
-  - `abi.ts`, `pulse.ts`, `output.ts` — single source of truth for ABIs,
-    contract reads, BigInt-safe JSON output.
-- **`scripts/pulse-retry.ts` + `pulse-recover` skill** — first-class
-  recovery primitive. Reads on-chain commitment state, validates the
-  reveal window, ensures funding (direction-aware), re-submits the gated
-  swap with the original nonce. Returns structured `Skipped` results
-  with reason codes when the commitment is in a terminal state or past
-  its window — so the agent can branch instead of paying gas on a doomed
-  retry.
-- **`scripts/pulse-introspect.ts` + `pulse-introspect` skill** — replaces
-  the agent's tendency to write inline `eth_getBlock` loops. Two modes:
-  recent-activity scan (`--last N` or `--from-block N`) and single-commitment
-  inspect (`--commitment-id N`). Decodes function selectors against
-  Pulse + ERC-20 + SwapTest ABIs. BigInt-safe.
-- **`autonomous-trade.ts` JSON contract** — when the swap reverts, the
-  output now includes a `recovery` block with the exact `pulseRetryCmd`
-  the agent should invoke verbatim. No nonce-grepping, no manual hash
-  reconstruction.
-- **SOUL.md** — added a "When something goes wrong" section pointing at
-  `pulse-introspect` first, then `pulse-recover` if the commitment is
-  recoverable, then `markExpired` if not. Hard rule: never write inline
-  block-scanners or one-shot retry scripts.
-- **README** — new "How to plug your agent into Pulse" section that
-  documents the script surface as the public contract, with three
-  guarantees (.env wins, failures are recoverable, BigInt-safe JSON) and
-  a 3-step minimal integrator flow.
-
-Verified live on Sepolia after the fix: commitment #12 succeeded end-to-end
-from a plain "sell 0.005 pETH for at least 1500 pUSD" prompt with no skill
-name. `getStatus(12) = Revealed`.
-
-### v0.2.0 — Autonomous trading agent in Telegram *(2026-04-29)*
-
-Pivot from "tool dispatcher in a CLI shim" to a real autonomous agent in
-the wild. The standalone `scripts/telegram-pulse-bot.ts` polling shim is
-deleted; everything is on Hermes' canonical infrastructure now.
-
-- **Hermes gateway** (`hermes gateway run` is the container's entrypoint)
-  replaces the polling shim entirely. Native Telegram support: persistent
-  sessions per `chat_id` in SQLite, voice memos transcribed via Whisper,
-  group chats, slash commands, `/model` picker, `/new`/`/reset`.
-- **Persona** — `hermes-sandbox/SOUL.md` defines the autonomous trading
-  agent identity (pulseagent.eth, ERC-8004 #3906, the wallet, hard
-  rules: never execute without committing first). Reloaded per turn,
-  shapes every response. `auth.sh` installs it into the container at
-  `/opt/data/SOUL.md`.
-- **Full tool catalog re-enabled** — `memory`, `cronjob`, `todo`,
-  `clarify`, `skills` all on. The body-size gate that forced us to trim
-  on Pro/Max OAuth no longer applies once an Anthropic API key is bound
-  alongside (Finding 3 in AUTH_NOTES.md).
-- **`pulse-autonomous-trade` keystone skill** —
-  [`packages/plugins/pulse-skills/skills/pulse-autonomous-trade/SKILL.md`](packages/plugins/pulse-skills/skills/pulse-autonomous-trade/SKILL.md).
-  The agent loads it whenever the user gives a trading objective in
-  natural language. The skill instructs the LLM to call
-  [`scripts/autonomous-trade.ts`](scripts/autonomous-trade.ts) which runs
-  the full reason → commit → wait → atomic-reveal swap cycle on Eth
-  Sepolia and emits structured JSON for Hermes to format.
-- **Force-drift demo** —
-  [`scripts/force-drift.ts`](scripts/force-drift.ts) commits an honest
-  intent A, attempts to execute a drifted intent B; the v4 hook reverts
-  before any state change; the watcher closes the rollback gap with a
-  direct `Pulse.reveal(B)`; commitment goes Violated, agent slashed
-  −1000 ERC-8004 reputation. The killshot demo.
-- **ERC-7857 (0G iNFT) integration scoped** — issue
-  [#1](https://github.com/ss251/ethglobal-openagents/issues/1) captures
-  the integration sketch for the 0G Open Agents Track 2 prize ($7,500).
-
-### v0.1.5 — Pre-publish doc sweep *(2026-04-29)*
-
-Bug fix in `scripts/gen-keys.ts` that wrote `https://sepolia.base.org`
-into freshly generated `.env` files; corrected to the publicnode Eth
-Sepolia RPC. Stale `forge.pulseagent.eth` references throughout the
-codebase replaced with the actually-registered `pulseagent.eth`.
-Outward-facing "Pulse Protocol" labels in CLI banners and the diagram
-title shortened to "Pulse" (README header retains the formal name).
-
-### v0.1.4 — Hermes invokes pulse-skills by name *(2026-04-29)*
-
-Bound a non-OAuth Anthropic API key alongside the existing OAuth
-credential; re-enabled the `skills` toolset that was previously closed
-off by the Claude Pro/Max body-size gate. With API key in the credential
-pool, the gate is gone and `hermes` can invoke pulse-skills by name via
-the SkillUse tool. Validated end-to-end with `pulse-status-check` on
-commitment #8: haiku-4-5 surfaced the full provenance trail in one turn.
-
-### v0.1.3 — Hermes-driven Pulse status check + AUTH_NOTES Finding 3 *(2026-04-29)*
-
-Added [`scripts/pulse-status.ts`](scripts/pulse-status.ts) — standalone
-helper mirroring the `pulse-status-check` skill recipe (used by agents
-and watchers). Documented Finding 3 in
-[`hermes-sandbox/AUTH_NOTES.md`](hermes-sandbox/AUTH_NOTES.md): enabling
-the `skills` toolset under Pro/Max OAuth pushes request body past the
-~23 KB threshold and the call hangs silently. Workaround documented as
-the API-key escape route used in v0.1.4.
-
-### v0.1.2 — ENS Track 1 deliverable *(2026-04-29)*
-
-- **`pulseagent.eth` registered** on Sepolia ENS, owned by the agent EOA
-  ([`0x30cB…397c`](https://sepolia.etherscan.io/address/0x30cB0080bFE9bB98d900726Fd3012175ee3D397c)).
-  Five text records (`agentId`, `signerProvider`, `pulseHistory`,
-  `description`, `avatar`) bound via the Public Resolver
-  [`0xE99638b4…E49b5`](https://sepolia.etherscan.io/address/0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5).
-- **`scripts/ens-bind-demo.ts`** — writes the records, resolves them back
-  via `pulseProvenanceFromENS()`, then submits Pulse commitment **#8**
-  using only ENS-resolved data. No hard-coded `agentId` or `signerProvider`
-  in the commit path. Tx
-  [`0xf36ff751…65ae`](https://sepolia.etherscan.io/tx/0xf36ff751fd35a719721bc7282eaf6dc1c51c69f8690481ea332bb2a8ef9565ae).
-- **`@pulse/sdk` exports**: `setAgentENSRecords`, `pulseProvenanceFromENS`,
-  `resolveAgentByENS` for downstream agents that want to bootstrap from a
-  name instead of an env file.
-
-### v0.1.1 — Eth Sepolia migration *(2026-04-29)*
-
-The whole stack moves from Base Sepolia to Eth Sepolia (chainId 11155111)
-to align with the ENS sponsor track and to put Pulse, ERC-8004, the v4
-hook, and ENS on the same chain — no cross-chain bridging required.
-
-- **Same deterministic addresses for `Pulse.sol`** (deployer + nonce
-  unchanged → CREATE collision-free); the v4 hook re-mined a salt against
-  Eth Sepolia's PoolManager and landed at
-  [`0x274b…c080`](https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080).
-- **Agent ERC-8004 #3906** registered against the canonical IdentityRegistry
-  on Eth Sepolia.
-- **All five validated flows re-run on Eth Sepolia.**
-  `e2e-commit-reveal`, `exercise-gated-swap`, `violation-and-rollback-demo`,
-  `sealed-inference-demo`, `phase8-tradingapi-demo` — each with fresh
-  Etherscan-verifiable tx hashes recorded in `deployments/sepolia.json`.
-
-### v0.1.0 — ETHGlobal Open Agents 2026 submission *(2026-04-29)*
-
-Initial protocol drop. Tagged so graders can pin to a specific commit.
-
-- **Contracts deployed on Eth Sepolia.** `Pulse.sol`
-  ([`0xbe1b…BF34`](https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34))
-  and `PulseGatedHook` ([`0x274b…c080`](https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080))
-  with mocks `pUSD` + `pWETH` and a wide-range LP position via `script/Phase2.s.sol`.
-- **Six live demos.** `e2e-commit-reveal`, `exercise-gated-swap`,
-  `violation-and-rollback-demo`, `sealed-inference-demo`, `phase8-tradingapi-demo`,
-  `watch-and-slash`. Each prints tx hashes you can open in Etherscan.
-- **17 tests passing.** Pulse + PulseGatedHook with the real `Deployers` /
-  `HookTest` utilities from v4-core / uniswap-hooks.
-- **Hermes integration verified end-to-end.** Agent prompt → Pulse contract
-  read on Eth Sepolia, billed against Claude Max OAuth subscription. See
-  [`hermes-sandbox/AUTH_NOTES.md`](hermes-sandbox/AUTH_NOTES.md) for the
-  two non-obvious blockers (stale Keychain entry, body-size gate) and
-  the fixes baked into `auth.sh`.
-- **0G sealed inference end-to-end.** qwen-2.5-7b-instruct reasoning
-  hashed into `reasoningCID` and anchored on chain via
-  `scripts/sealed-inference-demo.ts`.
-- **Architecture-decision-record.** [`docs/adr/0001-audit-perimeter.md`](docs/adr/0001-audit-perimeter.md)
-  captures the audit-perimeter thesis and the three load-bearing
-  trade-offs: atomic-rollback gap, Anthropic body-size gating, and
-  reveal-tx gas budgeting.
-
-### Pinned references
-
-The Excalidraw diagram source ([`ai/diagrams/pulse-architecture.excalidraw`](ai/diagrams/pulse-architecture.excalidraw))
-and a 2× rendered PNG ([`ai/diagrams/pulse-architecture.png`](ai/diagrams/pulse-architecture.png))
-are kept alongside the Mermaid block above as a drag-drop-editable
-backup for environments where Mermaid is unavailable.
+Latest: [v0.3.0 — Integrator pass](CHANGELOG.md#030--2026-04-29--integrator-pass).
 
 ## License
 
