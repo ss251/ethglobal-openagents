@@ -1,20 +1,42 @@
 # Pulse Protocol
 
-**Sealed Agent Commitments — extending the audit perimeter to the agent's reasoning.**
+**Make AI agents non-repudiable for the on-chain decisions they execute.**
 
-> Agents commit their decisions before they execute them — sealed reasoning,
-> ERC-8004 reputation, and Uniswap v4 hook gating make drift slashable
-> and (at the v4 layer) physically impossible.
+An autonomous trading agent gets prompt-injected mid-decision and tries to
+swap your principal into a memecoin. Or quietly skips a stop-loss. Or
+re-routes a stablecoin payout to an attacker-controlled address. **The
+smart contract is fine. The audit was clean. The agent's *reasoning* was
+the attack surface — and reasoning has never been auditable on chain.**
+
+Pulse closes that gap. Before an agent acts, it commits a hash of
+`(intent + sealed TEE reasoning)` on chain. Inside a fixed reveal window
+it must reveal an action that hashes to the same commitment — anything
+else is a slashable violation. On Uniswap v4 the same primitive is
+enforced *atomically* in `beforeSwap`: a drifted swap reverts before any
+state change. The agent's history is its identity (`pulseagent.eth`,
+ERC-8004 #3906) and travels with it across chains via an ERC-7857 iNFT
+on 0G Galileo.
+
+> "Pulse is the only primitive that makes agent drift physically
+> impossible at the protocol layer."
 
 [![Eth Sepolia](https://img.shields.io/badge/deployed-Eth%20Sepolia-blue?style=flat-square)](https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34)
 [![ERC-8004](https://img.shields.io/badge/ERC--8004-canonical-teal?style=flat-square)](https://github.com/erc-8004/erc-8004-contracts)
 [![Uniswap v4](https://img.shields.io/badge/Uniswap-v4%20hook-ff007a?style=flat-square)](https://docs.uniswap.org/contracts/v4/concepts/hooks)
 [![0G Compute](https://img.shields.io/badge/0G%20Compute-qwen--2.5--7b-purple?style=flat-square)](https://docs.0g.ai/build-with-0g/compute-network/sdk)
-[![Tests](https://img.shields.io/badge/forge%20test-27%2F27-brightgreen?style=flat-square)](#tests-27-passing)
-[![Release](https://img.shields.io/badge/release-v0.5.0-orange?style=flat-square)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/forge%20test-56%2F56-brightgreen?style=flat-square)](#tests-56-passing)
+[![Release](https://img.shields.io/badge/release-v0.9.0-orange?style=flat-square)](CHANGELOG.md)
 [![ERC-7857](https://img.shields.io/badge/ERC--7857-iNFT%20on%200G-purple?style=flat-square)](https://chainscan-galileo.0g.ai/address/0x180D8105dc415553e338BDB06251e8aC3e48227C)
+[![ENSIP-25](https://img.shields.io/badge/ENSIP--25-verified-5298ff?style=flat-square)](https://docs.ens.domains/ensip/25)
 [![Hermes](https://img.shields.io/badge/Hermes-Telegram%20gateway-7d5fff?style=flat-square)](https://hermes-agent.nousresearch.com/)
 [![ENS](https://img.shields.io/badge/ENS-pulseagent.eth-5298ff?style=flat-square)](https://sepolia.app.ens.domains/pulseagent.eth)
+
+<a href="ai/diagrams/pulse-accountability-gap.svg">
+  <img src="ai/diagrams/pulse-accountability-gap.png" alt="The Accountability Gap in Autonomous Agents — without Pulse, an injected agent rugs your principal; with Pulse, the v4 hook reverts before any state change and ERC-8004 slashes the violation." width="100%" />
+</a>
+
+<details>
+<summary><b>Full system diagram</b> (click to expand) — agent runtime, Pulse, ERC-8004, v4 hook, watcher</summary>
 
 ```mermaid
 flowchart TD
@@ -22,7 +44,7 @@ flowchart TD
     subgraph OFF["🛠 Off-chain — agent runtime · reasoning · market data"]
         direction LR
         Hermes["<b>Hermes container</b><br/>Nous Research<br/>Claude Max via OAuth"]
-        Skills["<b>pulse-skills bundle</b><br/>SKILL.md × 8"]
+        Skills["<b>pulse-skills bundle</b><br/>SKILL.md × 10"]
         Agent(["<b>Agent EOA</b><br/>pulseagent.eth<br/>0x30cB…397c · ERC-8004 #3906"])
         ZG["<b>0G Compute</b><br/>TEE-attested qwen-2.5-7b<br/>provider 0xa48f…"]
         Trade["<b>Uniswap Trading API</b><br/>/v1/quote · DUTCH_V2"]
@@ -37,6 +59,8 @@ flowchart TD
             Rep["<b>ERC-8004 ReputationRegistry</b><br/>0x8004B6…8713<br/>+100 / -1000 / -500"]
         end
         Pulse[["<b>Pulse.sol</b><br/>0xbe1b…BF34<br/>commit · reveal · markExpired"]]
+        Gate["<b>PulseGatedGate</b><br/>0x4d11…9379<br/>assertGate(agentId)"]
+        Lend["<b>PulseGatedLendingPool</b><br/>0x9b3f…4b16<br/>borrow gated on rep"]
         subgraph V4["Uniswap v4 stack"]
             direction TB
             Hook["<b>PulseGatedHook</b><br/>0x274b…c080<br/>beforeSwap — atomic reveal"]
@@ -60,6 +84,8 @@ flowchart TD
     Pulse -->|isAuthorizedOrOwner| ID
     Pulse ==>|giveFeedback| Rep
     Hook -.->|getCommitment + reveal| Pulse
+    Gate -.->|getSummary| Rep
+    Lend -.->|assertGate| Gate
 
     %% ── v4 swap path ──────────────────────────────────────────────────
     Agent ==>|swap hookData| PM
@@ -79,6 +105,7 @@ flowchart TD
     classDef ercBox fill:#e3fafc,stroke:#0b7285,stroke-width:2px,color:#1e1e1e
     classDef v4Box fill:#bac8ff,stroke:#5f3dc4,stroke-width:2px,color:#1e1e1e
     classDef watcherBox fill:#ffd8a8,stroke:#c92a2a,stroke-width:2px,color:#1e1e1e
+    classDef gateBox fill:#d0ebff,stroke:#0b7285,stroke-width:2px,color:#1e1e1e
 
     class Agent agentBox
     class Hermes hermesBox
@@ -89,7 +116,10 @@ flowchart TD
     class ID,Rep ercBox
     class Hook,PM,Pool v4Box
     class Watcher watcherBox
+    class Gate,Lend gateBox
 ```
+
+</details>
 
 > **Quick start.** `forge build && forge test` for the contracts;
 > `bun run scripts/e2e-commit-reveal.ts` for the full commit / reveal /
@@ -102,7 +132,8 @@ flowchart TD
 > **Architecture rationale + threat-model trade-offs.** See
 > [`docs/adr/0001-audit-perimeter.md`](docs/adr/0001-audit-perimeter.md).
 >
-> **Contents.** [What Pulse does](#what-pulse-does) ·
+> **Contents.** [Why this matters](#why-this-matters) ·
+> [What Pulse does](#what-pulse-does) ·
 > [Components](#components) · [Architecture](#architecture) ·
 > [Quick start](#quick-start) · [Repository layout](#repository-layout) ·
 > [Skills](#skills) ·
@@ -111,6 +142,8 @@ flowchart TD
 > [Status](#status) · [Live demos](#live-demos-on-eth-sepolia) ·
 > [Hermes integration](#hermes-integration--autonomous-pulse-bound-trading-agent-in-telegram) ·
 > [Releases](#releases) · [License](#license)
+
+## Why this matters
 
 On April 18, 2026, KelpDAO and Aave lost $292 million. The smart contracts
 were fine. No bug, no broken logic. The vulnerability was a single off-chain
@@ -121,10 +154,14 @@ not the same problem.* As protocols deepen integrations with off-chain
 infrastructure, the operational surface grows faster than the auditable code
 surface. ([Lessons From the KelpDAO Hack](https://www.openzeppelin.com/news/lessons-from-kelpdao-hack))
 
-**Autonomous AI agents widen this gap.** The most consequential off-chain
-component in any agent-driven protocol is the agent's *reasoning* — and audits
-never see it. A model can be injected, drifted, or socially engineered, and
-the contract executes the resulting action exactly as written.
+**Autonomous AI agents widen this gap by an order of magnitude.** The most
+consequential off-chain component in any agent-driven protocol is the
+agent's *reasoning* — and audits never see it. A model can be injected,
+drifted, or socially engineered, and the contract executes the resulting
+action exactly as written. The next big exploit in DeFi will not be a smart
+contract bug. It will be an agent that decided to do the wrong thing, in
+language that audits cannot evaluate, against a user who had no way to
+know it was about to happen.
 
 ## What Pulse does
 

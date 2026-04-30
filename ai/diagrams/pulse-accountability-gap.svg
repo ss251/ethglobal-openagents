@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" role="img"
+  aria-labelledby="title desc">
+  <title id="title">The Accountability Gap in Autonomous Agents — Pulse</title>
+  <desc id="desc">A two-pane causal diagram. Left pane shows what happens when an autonomous agent
+    drifts mid-decision without protocol-level enforcement: capital is lost. Right pane shows the
+    Pulse flow: sealed TEE reasoning, on-chain commit, Uniswap v4 hook gating, and ERC-8004
+    reputation slashing.</desc>
+
+  <defs>
+    <!-- subtle background grid -->
+    <pattern id="grid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255,255,255,0.025)" stroke-width="1" />
+    </pattern>
+    <!-- arrowheads -->
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9"
+      orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#FF3838" />
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9"
+      orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#00FF6B" />
+    </marker>
+    <marker id="arrow-pale" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9"
+      orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#666" />
+    </marker>
+    <!-- pane backgrounds -->
+    <linearGradient id="bgLeft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a0606" />
+      <stop offset="1" stop-color="#0d0303" />
+    </linearGradient>
+    <linearGradient id="bgRight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#04140a" />
+      <stop offset="1" stop-color="#021207" />
+    </linearGradient>
+    <!-- glow for verdict text -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.5" result="b" />
+      <feMerge>
+        <feMergeNode in="b" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <style><![CDATA[
+    .bg            { fill: #050505; }
+    .grid-overlay  { fill: url(#grid); }
+    .label-tag     { font: 600 11px/1 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace;
+                     letter-spacing: 0.18em; text-transform: uppercase; }
+    .pane-title    { font: 700 22px/1 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace;
+                     letter-spacing: 0.04em; }
+    .step-label    { font: 600 10px/1 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace;
+                     letter-spacing: 0.22em; text-transform: uppercase; }
+    .step-text     { font: 500 14px/1.3 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace; }
+    .step-text-tight { font: 500 13px/1.3 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace; }
+    .arrow-text    { font: 500 11px/1.2 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace; }
+    .verdict       { font: 700 16px/1 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace;
+                     letter-spacing: 0.12em; text-transform: uppercase; }
+    .caption       { font: italic 11px/1.4 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace; }
+    .title         { font: 700 30px/1 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace;
+                     letter-spacing: 0.02em; }
+    .subtitle      { font: 500 13px/1 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace;
+                     letter-spacing: 0.22em; text-transform: uppercase; }
+    .banner-text   { font: 700 16px/1.4 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace;
+                     letter-spacing: 0.02em; }
+    .banner-tag    { font: 600 10px/1 ui-monospace,"JetBrains Mono","SF Mono",Menlo,monospace;
+                     letter-spacing: 0.28em; text-transform: uppercase; }
+    .red           { fill: #FF3838; }
+    .red-soft      { fill: #ffadad; }
+    .red-dim       { fill: #c66; }
+    .green         { fill: #00FF6B; }
+    .green-soft    { fill: #c8f7d7; }
+    .green-dim     { fill: #6bd99a; }
+    .ink           { fill: #f0e8d8; }
+    .muted         { fill: #76705f; }
+    .pale          { fill: #b9b3a1; }
+  ]]></style>
+
+  <!-- background -->
+  <rect class="bg" width="1200" height="760" />
+  <rect class="grid-overlay" width="1200" height="760" />
+
+  <!-- ============== HEADER ============== -->
+  <g transform="translate(600, 50)">
+    <text class="subtitle muted" text-anchor="middle" y="0">PULSE PROTOCOL · WHY THIS PRIMITIVE</text>
+    <text class="title ink" text-anchor="middle" y="36">The Accountability Gap in Autonomous Agents</text>
+  </g>
+
+  <!-- ============== LEFT PANE (without pulse) ============== -->
+  <g transform="translate(40, 120)">
+    <rect width="540" height="540" rx="12" fill="url(#bgLeft)" stroke="#FF3838" stroke-width="1.5"
+      stroke-opacity="0.55" />
+
+    <!-- pane label -->
+    <rect x="20" y="-10" width="170" height="22" rx="2" fill="#050505" />
+    <text class="label-tag red" x="30" y="6">▼ WITHOUT PULSE</text>
+
+    <!-- pane title -->
+    <text class="pane-title red-soft" x="32" y="48">An agent gets injected.</text>
+    <text class="step-text-tight pale" x="32" y="74">Reasoning is the attack surface. Audits never see it.</text>
+    <line x1="32" y1="92" x2="508" y2="92" stroke="#FF3838" stroke-opacity="0.25" stroke-width="1" />
+
+    <!-- step 1 box -->
+    <g transform="translate(32, 112)">
+      <text class="step-label red-dim" y="0">01 · INTENT</text>
+      <rect y="10" width="476" height="46" rx="6" fill="rgba(255,56,56,0.05)"
+        stroke="rgba(255,56,56,0.4)" stroke-width="1" />
+      <text class="step-text ink" x="14" y="38">Agent plans stop-loss at $1,500</text>
+    </g>
+
+    <!-- arrow 1 -->
+    <g transform="translate(32, 178)">
+      <line x1="20" y1="0" x2="20" y2="34" stroke="#FF3838" stroke-width="2"
+        marker-end="url(#arrow-red)" />
+      <text class="arrow-text red" x="44" y="22">prompt injection mid-flight</text>
+    </g>
+
+    <!-- step 2 box -->
+    <g transform="translate(32, 222)">
+      <text class="step-label red-dim" y="0">02 · DRIFT</text>
+      <rect y="10" width="476" height="46" rx="6" fill="rgba(255,56,56,0.05)"
+        stroke="rgba(255,56,56,0.4)" stroke-width="1" />
+      <text class="step-text ink" x="14" y="38">Agent rationalises → buys 10x leverage long</text>
+    </g>
+
+    <!-- arrow 2 (thick) -->
+    <g transform="translate(32, 288)">
+      <line x1="20" y1="0" x2="20" y2="40" stroke="#FF3838" stroke-width="3"
+        marker-end="url(#arrow-red)" />
+      <text class="arrow-text red" x="44" y="26">contract executes exactly what it&#x27;s told</text>
+    </g>
+
+    <!-- step 3 verdict -->
+    <g transform="translate(32, 338)">
+      <rect y="0" width="476" height="64" rx="6" fill="rgba(255,56,56,0.12)"
+        stroke="#FF3838" stroke-width="2" />
+      <text class="verdict red" x="20" y="28" filter="url(#glow)">CAPITAL LOST. NO RECOURSE.</text>
+      <text class="step-text-tight pale" x="20" y="52">Liquidated in 3 minutes. The audit was clean.</text>
+    </g>
+
+    <!-- caption -->
+    <g transform="translate(32, 432)">
+      <text class="caption muted" y="0">no cryptographic binding · no slashing · no protocol enforcement</text>
+      <text class="caption muted" y="18">↳ this is the agent economy in 2026, with no accountability layer</text>
+    </g>
+
+    <!-- failure case study -->
+    <g transform="translate(32, 480)">
+      <rect width="476" height="40" rx="4" fill="rgba(255,56,56,0.06)"
+        stroke="rgba(255,56,56,0.25)" stroke-width="1" stroke-dasharray="4 4" />
+      <text class="step-label red-dim" x="14" y="16">PRECEDENT</text>
+      <text class="caption pale" x="14" y="32">KelpDAO + Aave, April 2026: $292M lost — code was fine, off-chain
+        decision was the gap</text>
+    </g>
+  </g>
+
+  <!-- ============== RIGHT PANE (with pulse) ============== -->
+  <g transform="translate(620, 120)">
+    <rect width="540" height="540" rx="12" fill="url(#bgRight)" stroke="#00FF6B" stroke-width="1.5"
+      stroke-opacity="0.55" />
+
+    <!-- pane label -->
+    <rect x="20" y="-10" width="170" height="22" rx="2" fill="#050505" />
+    <text class="label-tag green" x="30" y="6">▲ WITH PULSE</text>
+
+    <!-- pane title -->
+    <text class="pane-title green-soft" x="32" y="48">Drift becomes physically impossible.</text>
+    <text class="step-text-tight pale" x="32" y="74">Reasoning is committed before action. Mismatch reverts.</text>
+    <line x1="32" y1="92" x2="508" y2="92" stroke="#00FF6B" stroke-opacity="0.25" stroke-width="1" />
+
+    <!-- step 1 box -->
+    <g transform="translate(32, 112)">
+      <text class="step-label green-dim" y="0">01 · SEALED REASONING</text>
+      <rect y="10" width="476" height="46" rx="6" fill="rgba(0,255,107,0.05)"
+        stroke="rgba(0,255,107,0.4)" stroke-width="1" />
+      <text class="step-text ink" x="14" y="32">0G Compute TEE → reasoning text +</text>
+      <text class="step-text-tight pale" x="14" y="48">EIP-191 signature over (intent, reasoningCID)</text>
+    </g>
+
+    <!-- arrow 1 -->
+    <g transform="translate(32, 178)">
+      <line x1="20" y1="0" x2="20" y2="34" stroke="#00FF6B" stroke-width="2"
+        marker-end="url(#arrow-green)" />
+      <text class="arrow-text green" x="44" y="22">commit BEFORE acting</text>
+    </g>
+
+    <!-- step 2 box -->
+    <g transform="translate(32, 222)">
+      <text class="step-label green-dim" y="0">02 · ON-CHAIN COMMIT</text>
+      <rect y="10" width="476" height="46" rx="6" fill="rgba(0,255,107,0.05)"
+        stroke="rgba(0,255,107,0.4)" stroke-width="1" />
+      <text class="step-text ink" x="14" y="32">Pulse.commit(intentHash, reasoningCID,</text>
+      <text class="step-text-tight pale" x="14" y="48">agentId=pulseagent.eth · ERC-8004 #3906)</text>
+    </g>
+
+    <!-- arrow 2 -->
+    <g transform="translate(32, 288)">
+      <line x1="20" y1="0" x2="20" y2="34" stroke="#00FF6B" stroke-width="2"
+        marker-end="url(#arrow-green)" />
+      <text class="arrow-text green" x="44" y="22">enforced atomically in beforeSwap</text>
+    </g>
+
+    <!-- step 3 box - hook -->
+    <g transform="translate(32, 332)">
+      <text class="step-label green-dim" y="0">03 · UNISWAP V4 HOOK GATES</text>
+      <rect y="10" width="476" height="46" rx="6" fill="rgba(0,255,107,0.05)"
+        stroke="rgba(0,255,107,0.4)" stroke-width="1" />
+      <text class="step-text ink" x="14" y="38">PulseGatedHook.beforeSwap → hash-verifies intent</text>
+    </g>
+
+    <!-- two outcome arrows -->
+    <g transform="translate(32, 396)">
+      <!-- bad path -->
+      <line x1="20" y1="0" x2="20" y2="22" stroke="#FF3838" stroke-width="2"
+        marker-end="url(#arrow-red)" />
+      <text class="arrow-text red" x="44" y="14">BAD INTENT</text>
+      <text class="arrow-text pale" x="158" y="14">→ revert before any state change · -1000 rep</text>
+      <!-- good path -->
+      <line x1="20" y1="32" x2="20" y2="54" stroke="#00FF6B" stroke-width="2"
+        marker-end="url(#arrow-green)" />
+      <text class="arrow-text green" x="44" y="46">KEPT INTENT</text>
+      <text class="arrow-text pale" x="158" y="46">→ swap proceeds · +100 ERC-8004 reputation</text>
+    </g>
+
+    <!-- caption -->
+    <g transform="translate(32, 480)">
+      <rect width="476" height="40" rx="4" fill="rgba(0,255,107,0.06)"
+        stroke="rgba(0,255,107,0.25)" stroke-width="1" stroke-dasharray="4 4" />
+      <text class="step-label green-dim" x="14" y="16">VERIFIED LIVE</text>
+      <text class="caption pale" x="14" y="32">Eth Sepolia · 56/56 forge tests · agent #3906 borrowing through
+        the gate today</text>
+    </g>
+  </g>
+
+  <!-- ============== BOTTOM BANNER ============== -->
+  <g transform="translate(40, 690)">
+    <rect width="1120" height="50" rx="6" fill="#0a0a0a" stroke="#f0e8d8" stroke-opacity="0.18"
+      stroke-width="1" />
+    <text class="banner-tag muted" x="22" y="20">PULSE</text>
+    <text class="banner-text ink" x="22" y="38">First primitive that makes agent decisions
+      non-repudiable at both the contract layer
+      <tspan fill="#FF3838" font-weight="700">AND</tspan> the AMM layer.</text>
+  </g>
+</svg>
