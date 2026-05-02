@@ -239,8 +239,8 @@
     <rect width="1120" height="50" rx="6" fill="#0a0a0a" stroke="#f0e8d8" stroke-opacity="0.18"
       stroke-width="1" />
     <text class="banner-tag muted" x="22" y="20">PULSE</text>
-    <text class="banner-text ink" x="22" y="38">First primitive that makes agent decisions
-      non-repudiable at both the contract layer
+    <text class="banner-text ink" x="22" y="38">First primitive that enforces agent accountability
+      at both the contract layer
       <tspan fill="#FF3838" font-weight="700">AND</tspan> the AMM layer.</text>
   </g>
 

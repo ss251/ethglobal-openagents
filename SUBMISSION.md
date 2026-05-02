@@ -10,7 +10,7 @@ script invocations are reproducible from `main` at tag `v0.6.0`.
 
 ## Project description (short)
 
-**Pulse makes AI agents non-repudiable for the on-chain decisions they
+**Pulse makes AI agents accountable for the on-chain decisions they
 execute.** Before acting, an agent commits a hash of `(intent + sealed
 TEE reasoning)` on chain. Inside a reveal window it must reveal an
 action that hashes to the same commitment — anything else is a slashable
@@ -354,7 +354,7 @@ Pulse is shipped as a real consumable library, not a one-off demo:
 > Verify each prize-track checkbox is ticked: **0G Compute, 0G iNFT, Uniswap, ENS, KeeperHub.**
 
 - **Project name**: Pulse
-- **Short description**: Pulse makes AI agents non-repudiable for the on-chain decisions they execute. Agents commit a hash of (intent + sealed TEE reasoning) before acting. Drift is slashable on ERC-8004; on Uniswap v4 the hook reverts wrong-intent swaps before any state change. Identity travels via ENS + ENSIP-25 + ERC-7857 iNFT on 0G. A live lending-pool reference consumer shows downstream protocols how to gate real-money flows on Pulse rep in two lines.
+- **Short description**: Pulse makes AI agents accountable for the on-chain decisions they execute. Agents commit a hash of (intent + sealed TEE reasoning) before acting. Drift is slashable on ERC-8004; on Uniswap v4 the hook reverts wrong-intent swaps before any state change. Identity travels via ENS + ENSIP-25 + ERC-7857 iNFT on 0G. A live lending-pool reference consumer shows downstream protocols how to gate real-money flows on Pulse rep in two lines.
 - **Long description**: (paste the "Project description (long)" block above)
 - **Source code**: <https://github.com/ss251/ethglobal-openagents> (tag v0.9.0)
 - **Demo video**: TODO — see "90-second video plan" in README. Lead with

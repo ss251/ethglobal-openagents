@@ -1,6 +1,6 @@
 # Pulse Protocol
 
-**Make AI agents non-repudiable for the on-chain decisions they execute.**
+**Make AI agents accountable for the on-chain decisions they execute.**
 
 An autonomous trading agent gets prompt-injected mid-decision and tries to
 swap your principal into a memecoin. Or quietly skips a stop-loss. Or
