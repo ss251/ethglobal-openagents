@@ -52,6 +52,18 @@ services:
       - no-new-privileges:true
 
   dashboard:
+    # Override upstream's `network_mode: host` + `--host 127.0.0.1` so the
+    # web UI is reachable from macOS host. Upstream's host-network mode
+    # makes the dashboard unreachable on macOS (Linux VM's loopback ≠
+    # macOS loopback). Bridge + 127.0.0.1-bound port + --insecure fixes it.
+    # `--insecure` is required to bind 0.0.0.0 inside the container; the
+    # port is only published on macOS loopback (127.0.0.1:9119), so it is
+    # NOT exposed beyond the host. Local-demo only — do NOT enable on a
+    # shared/remote machine.
+    network_mode: bridge
+    command: ["dashboard", "--host", "0.0.0.0", "--no-open", "--insecure"]
+    ports:
+      - "127.0.0.1:9119:9119"
     environment:
       - HERMES_UID=${HERMES_UID:-10000}
       - HERMES_GID=${HERMES_GID:-10000}

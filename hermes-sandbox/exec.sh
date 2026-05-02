@@ -13,8 +13,13 @@ if [ -z "$(docker ps -q -f name=^hermes$)" ]; then
 fi
 
 # If args provided, run them as a hermes command. Otherwise drop into shell.
+# Always run as the `hermes` user (not container root) and source the venv so
+# the `hermes` binary is on PATH. Set workdir to the mounted repo so any skill
+# that shells out to `bun run scripts/...` resolves relative paths cleanly.
 if [ $# -eq 0 ]; then
-  docker exec -it hermes bash
+  docker exec -it -u hermes -w /workspace/ethglobal-openagents hermes \
+    bash -c 'source /opt/hermes/.venv/bin/activate && exec bash'
 else
-  docker exec -it hermes hermes "$@"
+  docker exec -it -u hermes -w /workspace/ethglobal-openagents hermes \
+    bash -c "source /opt/hermes/.venv/bin/activate && exec hermes $(printf ' %q' "$@")"
 fi
