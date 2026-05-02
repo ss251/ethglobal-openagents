@@ -128,6 +128,61 @@
     color: var(--phosphor);
   }
 
+  /* ─── protocol intro (project pitch) ───────────────────────────────── */
+  .protocol-intro {
+    margin: 18px 0 8px;
+    max-width: 64ch;
+  }
+  .protocol-pitch {
+    font-size: 14px; line-height: 1.6; color: var(--ink);
+    margin-bottom: 16px;
+  }
+  .protocol-pitch strong { color: var(--paper); font-weight: 500; }
+  .protocol-links {
+    display: flex; gap: 14px 22px; flex-wrap: wrap;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .protocol-links a {
+    color: var(--phosphor); text-decoration: none;
+    border-bottom: 1px solid rgba(0,255,107,0.28);
+    padding-bottom: 1px; transition: all 0.12s;
+  }
+  .protocol-links a:hover {
+    border-bottom-color: var(--phosphor);
+    text-shadow: var(--phosphor-glow);
+  }
+
+  /* ─── demo chips above input ───────────────────────────────────────── */
+  .demo-chips {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 14px;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .demo-chips .label { color: var(--dim); margin-right: 4px; }
+  .demo-chip {
+    padding: 4px 10px;
+    background: rgba(0,255,107,0.05);
+    border: 1px solid rgba(0,255,107,0.28);
+    color: var(--phosphor);
+    cursor: pointer; font-family: var(--mono);
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    transition: all 0.12s;
+  }
+  .demo-chip:hover {
+    background: rgba(0,255,107,0.12);
+    box-shadow: 0 0 8px rgba(0,255,107,0.18);
+  }
+  .demo-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--phosphor-bg);
+    border: 1px solid rgba(0,255,107,0.4);
+    color: var(--phosphor);
+    font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 500;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
   /* ─── input panel ──────────────────────────────────────────────────── */
   .console {
     margin: 56px 0 24px;
@@ -369,14 +424,36 @@
 
   <h1 class="wordmark"><span class="word">PULSE</span><span class="slash">/</span><span class="word">GATE</span></h1>
 
+  <section class="protocol-intro">
+    <p class="protocol-pitch">
+      <strong>On-chain auditable reasoning for AI agents.</strong> Agents commit a hash of intent + sealed TEE
+      reasoning before acting; drift is slashable on <a href="https://github.com/erc-8004/erc-8004-contracts" target="_blank" rel="noopener">ERC-8004</a>;
+      on Uniswap v4, the hook reverts wrong-intent swaps before any state change. Identity travels via ENS +
+      ERC-7857 iNFT on 0G.
+    </p>
+    <div class="protocol-links">
+      <a href="https://github.com/ss251/ethglobal-openagents" target="_blank" rel="noopener">▸ github</a>
+      <a href="https://sepolia.etherscan.io/address/0xbe1b0051f5672F3CAAc38849B8Aaeeb51Dc6BF34" target="_blank" rel="noopener">▸ pulse contract</a>
+      <a href="https://sepolia.etherscan.io/address/0x274b3c0f55c2db8c392418649c1eb3aad1ecc080" target="_blank" rel="noopener">▸ v4 hook</a>
+      <a href="https://sepolia.etherscan.io/address/0x9b3f062faa2934b8ba0bc4c8b1ab4315c2b24b16" target="_blank" rel="noopener">▸ lending pool</a>
+      <a href="https://chainscan-galileo.0g.ai/address/0x180D8105dc415553e338BDB06251e8aC3e48227C" target="_blank" rel="noopener">▸ inft on 0G</a>
+      <a href="https://sepolia.app.ens.domains/pulseagent.eth" target="_blank" rel="noopener">▸ pulseagent.eth on ENS</a>
+    </div>
+  </section>
+
   <p class="lede">
-    Reference reader of <a href="https://github.com/erc-8004/erc-8004-contracts" target="_blank" rel="noopener">ERC-8004</a> reputation
-    filtered by <code>tag1="pulse"</code>. Reads the canonical <code>getSummary</code>, applies a threshold,
-    surfaces the agent's commitment trail. Two lines for any protocol to compose with.
+    Below: the reference reader. Reads the canonical <code>getSummary</code> filtered by <code>tag1="pulse"</code>,
+    applies a threshold, surfaces the agent's commitment trail. Two lines for any protocol to compose with.
   </p>
 
   <section class="console">
     <span class="console-label">▸ probe</span>
+    <div class="demo-chips">
+      <span class="label">try:</span>
+      <button class="demo-chip" type="button" onclick="loadAgent('pulseagent.eth')">pulseagent.eth · #3906</button>
+      <button class="demo-chip" type="button" onclick="loadAgent('3906')">numeric id 3906</button>
+      <span class="label" style="margin-left:6px">— sepolia testnet, single demo agent</span>
+    </div>
     <form id="f">
       <span class="prompt">id</span>
       <input id="agentId" type="text" placeholder="ens name or erc-8004 agent id  (e.g. pulseagent.eth)" autocomplete="off" autofocus />
@@ -464,7 +541,11 @@ const $result = document.getElementById("result");
 const $status = document.getElementById("status");
 const $err = document.getElementById("err");
 
-if (params.get("agent")) $agent.value = params.get("agent");
+if (params.get("agent")) {
+  $agent.value = params.get("agent");
+  // Auto-trace so the demo URL renders the verdict without a manual click.
+  queueMicrotask(() => $f.requestSubmit());
+}
 
 // ─── flow ───────────────────────────────────────────────────────────────
 $f.addEventListener("submit", async (e) => {
@@ -815,6 +896,15 @@ function setStatus(msg) {
   if (!msg) { $status.hidden = true; $status.textContent = ""; return; }
   $status.textContent = msg; $status.hidden = false;
 }
+
+// Demo chips — wire up the example agent buttons (module scope, so expose globally).
+window.loadAgent = function (name) {
+  const input = document.getElementById("agentId");
+  if (!input) return;
+  input.value = name;
+  input.focus();
+  document.getElementById("f").requestSubmit();
+};
 </script>
 </body>
 </html>
